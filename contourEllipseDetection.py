@@ -99,12 +99,40 @@ class ellipseDetection():
 
     def createImageRegion(self, image, coord, axes, resizeSize): ## given an image, central coordinates and axes, output the respective slice of image; resize to desired shape
         x, y = coord
-        length = np.max(axes[0], axes[1])
-        xStart = int(x - 0.5*length)
-        yStart = (y - 0.5*length)
 
-        segment = image[yStart:(yStart + length), xStart:(xStart + length)] ## ensure axes are right. OpenCV is odd in that color channels are BGR, which makes for an intersting time. 
+        imH, imW, channels = image.shape ## getting shape to know bounds. 
+
+        length = int(np.maximum(axes[0], axes[1]))
+        xStart = int(x - 0.5*length)
+        yStart = int(y - 0.5*length)
+        xEnd = xStart + length
+        yEnd = yStart + length
+
+        ## for catching excepptions where region is out of image bounds. 
+        if xStart < 0:
+            xStart = 0
+            xEnd = xStart + length
+        if yStart < 0:
+            yStart = 0
+            yEnd = yStart + length
+        if xEnd > imW:
+            xEnd = imW
+            xStart = xEnd - length
+        if yEnd > imH:
+            yEnd = imH
+            yStart = yEnd - length
+
+    
+
+        # print(x,y,axes[0],axes[1], length)
+        # print(xStart, yStart,xEnd, yEnd)
+
+        # print(image.shape)
+        testsegment = image[975:995,23:43,:]
+        segment = image[yStart:yEnd,xStart:xEnd,:] ## ensure axes are right. OpenCV is odd in that color channels are BGR, which makes for an intersting time. 
+        # print(segment.shape, testsegment.shape,resizeSize)
         segment = cv2.resize(segment, resizeSize, cv2.INTER_LINEAR)
+        # print(segment.shape)
 
         return segment
     
@@ -131,11 +159,18 @@ class ellipseDetection():
     
                 segment = self.createImageRegion(RGBimg, coord,axes,resize)   ## segmenting region cell is in. 
                 with torch.no_grad():
-                    outputs = classifyNet(segment)
-                    classPrediction = classifyNet(segment) ## prediction of class from classification network
-                    _, index = torch.max(classPrediction) ## getting largest value for prediction output
+                    # print(segment.shape)
+                    segment = np.transpose(segment, [2, 0, 1])
+                    segment = np.expand_dims(segment, 0)
+                    # print(segment.shape)
+                    segment = torch.from_numpy(segment)
+                    segment = segment.float() ## necessary for weight multiplication. 
 
-                    classPrediction = classList(index)
+                    classPrediction = classifyNet(segment) ## prediction of class from classification network
+                    # print(classPrediction)
+                    _, index = torch.max(classPrediction, dim=1) ## getting largest value for prediction output
+
+                    classPrediction = classList[index]
 
                     #    adding string of classtype at the end after processing for nan values
                     ell_coord.append(classPrediction)
@@ -199,6 +234,7 @@ this function also has the input of the rgb source image to segment the region t
 def getEllipsesFromClassListClassifier(BWimg, RGBimg,classifyNet, classList): 
     ellipseCoord = ellipseDetection()
 
+    print(BWimg.shape)
     ellipses = ellipseCoord.ellipseCoordsClassifier(BWimg,RGBimg,classifyNet,classList)  
     ellipses = suppressUndesirableEllipses(ellipses)  ### getting rid of any ellipses that do not fit appropriate parameters. 
 

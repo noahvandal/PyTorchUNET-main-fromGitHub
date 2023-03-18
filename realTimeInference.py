@@ -129,11 +129,11 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
 
         # getting actual color mapping of all classes present
         totalOutputImage = onehot_to_rgb(output, cellColor2Label)
-        totalOutputImage = RGBtoBW(totalOutputImage) ## outputs a b/w mask from classwise segmentation. Easier than updating network and weights each time class switches. 
-
+        bwImage = RGBtoBW(totalOutputImage, False) ## outputs a b/w mask from classwise segmentation. Easier than updating network and weights each time class switches. 
+        bwImage = np.bitwise_not(bwImage)
 
         # getting ellipses for each class present
-        totalEllipses = getEllipsesFromClassListClassifier(origImg,totalOutputImage,classificationModel, classifyList)
+        totalEllipses = getEllipsesFromClassListClassifier(bwImage,origImg,classificationModel, classifyList)
 
         tracker = Tracking(CurrentDict, GlobalList, totalEllipses,
                            id, pixelChange, magnification)   ## update list based on points in previous frame. 
@@ -194,7 +194,7 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
 
 
 
-def runMultipleVideos(rootPath, extraName, modelPath):
+def runMultipleVideos(rootPath, extraName, modelPath, classifyModelPath):
     videoList = os.listdir(rootPath)
     for video in videoList:
         videoName = video[:-4]
@@ -213,7 +213,7 @@ def runMultipleVideos(rootPath, extraName, modelPath):
 
         magnification = 25
 
-        main(videoPath, saveImagePath, saveCSVPath, modelPath, magnification)
+        main(videoPath, saveImagePath, saveCSVPath, modelPath,classifyModelPath, magnification)
 
 
 if __name__ == '__main__':
@@ -228,13 +228,15 @@ if __name__ == '__main__':
     # 'Videos/Train Images/3D Train/FullTrainDataset/Weights/01182023_ReduceLRonPlateau_model_2xscale.pt'
 
     modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneModels/021123_2x_3c_Train_model.pt'
+
+    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/031623_2c_v1_shuffle10e_reducelr1000e_095_impure.pt'
     # videoPath = rootPath + 'DatasetFeb10/HPNE/230203121917.mp4'
     # videoPath = rootPath + \
     # 'Videos/August 2022/20um/5ul_min/25x mag/1280x960 px/5_25_1280_0.mp4'
     # magnification = 25
-    date = '_3c_teset_021222_'
+    date = '_3c_test_031723_'
 
     # main(videoPath, saveImagePath, saveCSVPath,
         #  modelPath, magnification=magnification)
-    runMultipleVideos(rootPath + 'DatasetDec15Cells/HPNE/',date, modelPath)
-    runMultipleVideos(rootPath + 'DatasetDec15Cells/MIA/',date, modelPath)
+    runMultipleVideos(rootPath + 'DatasetDec15Cells/HPNE/',date, modelPath, classifyModelPath)
+    # runMultipleVideos(rootPath + 'DatasetDec15Cells/MIA/',date, modelPath)

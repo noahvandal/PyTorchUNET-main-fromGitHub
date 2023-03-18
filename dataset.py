@@ -9,6 +9,7 @@ import PIL
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
+import cv2
 
 # create labels for each of the classes, resepective to the color scheme given for mask creation
 Label = namedtuple('Label', ['name', 'id', 'color'])
@@ -213,11 +214,13 @@ def outputClassImages(onehot, color_dict):
 
 
 ## instead of modifying class based output, will simply convert to bw whenever a non-background class is present. 
-def RGBtoBW(image):
+def RGBtoBW(image, isGrayscale=False):
     image = image.astype('uint8')
     bw = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY).astype('uint8')
     ret, bw = cv2.threshold(bw,254,255,cv2.THRESH_BINARY)  ## threshold to combine all colors in output channel
-    bw = np.expand_dims(bw, axis=-1)  ## making 3-d tupule
-    bw = cv2.cvtColor(bw, cv2.COLOR_GRAY2RGB)
+    
+    if isGrayscale:
+        bw = np.expand_dims(bw, axis=-1)  ## making 3-d tupule
+        bw = cv2.cvtColor(bw, cv2.COLOR_GRAY2RGB)
     
     return bw
