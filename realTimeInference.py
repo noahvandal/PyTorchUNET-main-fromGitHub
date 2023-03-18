@@ -1,5 +1,5 @@
 from preProcess import preProcess
-from contourEllipseDetection import ellipseDetection, processOneHotIntoClassBW, getEllipsesFromClassList
+from contourEllipseDetection import ellipseDetection, processOneHotIntoClassBW, getEllipsesFromClassList, getEllipsesFromClassListClassifier
 from tracking import Tracking, postVideoProcessList
 import torch
 import cv2
@@ -9,12 +9,13 @@ import numpy as np
 from model import UNET
 from IPython.display import clear_output
 from auxiliary import saveImageOutput, putEllipsesOnImage, suppressUndesirableEllipses
-from dataset import cellColor2Label, color2label, outputClassImages
+from dataset import cellColor2Label, color2label, outputClassImages, RGBtoBW
 from evaluate import onehot_to_rgb
 from torchvision import transforms
 from newTracking import Tracking
 import time
 import os
+from classifier import Classify
 
 if torch.cuda.is_available():
     DEVICE = 'cuda:1'
@@ -25,7 +26,7 @@ else:
 IMAGE_SHAPE = (960, 1280)
 
 
-def main(videoPath, saveImagePath, saveCSVPath, modelPath, magnification):
+def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, magnification):
 
     headerFile = ['ID', 'Coordinates', 'Axes Length', 'Number of Frames Present',
                   'Average Speed (px)', 'Identity', 'Number of frames as identity', 'Diameter']  # data for csv output
@@ -38,6 +39,15 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, magnification):
 
     model = model.to(DEVICE)
 
+
+    """
+    The following section of code is for the classification network, if present. 
+    """
+    classificationModel = Classify(1) ## batch size of 1
+    checkpoint = torch.load(classifyModelPath)
+    classificationModel.load_state_dict(checkpoint['model_state_dict'])
+
+
     # model = torch.load(modelPath).to(DEVICE)
 
     GlobalList = []
@@ -46,6 +56,9 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, magnification):
     id = 0
 
     nameList = ['HPNE', 'MIA', 'PSBead', 'All']
+
+    classifyList = ['HPNE','MIA']
+
     # magnification = 25
 
     pixelChange = 1  # just tracking movement of pixels through frames
@@ -103,13 +116,24 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, magnification):
 
         output = output.detach().cpu().numpy()  ## to pull from gpu for inferencing on cpu
 
-        allimgs = outputClassImages(output, cellColor2Label)  ## getting ellipses from each class list 
+        
+        '''
+        Functions to use if doing unet classification:: 
+        
+        allimgs = outputClassImages(output, cellColor2Label)  ## getting a b/w mask for each class type present.
+
+        # getting ellipses for each class present
+        # totalEllipses = getEllipsesFromClassList(allimgs, nameList)
+
+        '''
 
         # getting actual color mapping of all classes present
         totalOutputImage = onehot_to_rgb(output, cellColor2Label)
+        totalOutputImage = RGBtoBW(totalOutputImage) ## outputs a b/w mask from classwise segmentation. Easier than updating network and weights each time class switches. 
+
 
         # getting ellipses for each class present
-        totalEllipses = getEllipsesFromClassList(allimgs, nameList)
+        totalEllipses = getEllipsesFromClassListClassifier(origImg,totalOutputImage,classificationModel, classifyList)
 
         tracker = Tracking(CurrentDict, GlobalList, totalEllipses,
                            id, pixelChange, magnification)   ## update list based on points in previous frame. 

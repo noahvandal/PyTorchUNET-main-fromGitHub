@@ -210,3 +210,14 @@ def outputClassImages(onehot, color_dict):
     # totalOutput = np.concatenate(np.array(outputList), axis=-1)
     outputList.append(totalOutput)
     return outputList
+
+
+## instead of modifying class based output, will simply convert to bw whenever a non-background class is present. 
+def RGBtoBW(image):
+    image = image.astype('uint8')
+    bw = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY).astype('uint8')
+    ret, bw = cv2.threshold(bw,254,255,cv2.THRESH_BINARY)  ## threshold to combine all colors in output channel
+    bw = np.expand_dims(bw, axis=-1)  ## making 3-d tupule
+    bw = cv2.cvtColor(bw, cv2.COLOR_GRAY2RGB)
+    
+    return bw
