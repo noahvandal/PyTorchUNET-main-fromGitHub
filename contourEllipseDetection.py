@@ -128,12 +128,12 @@ class ellipseDetection():
                     # setting entire-box bounds that are found as non found circles
                     if (np.isinf(ell_coord[i]) == True):
                         ell_coord[i] = 0.01
-
+    
                 segment = self.createImageRegion(RGBimg, coord,axes,resize)   ## segmenting region cell is in. 
                 with torch.no_grad():
                     outputs = classifyNet(segment)
                     classPrediction = classifyNet(segment) ## prediction of class from classification network
-                    _, index = torch.max(classPrediction)
+                    _, index = torch.max(classPrediction) ## getting largest value for prediction output
 
                     classPrediction = classList(index)
 
@@ -145,6 +145,8 @@ class ellipseDetection():
 
             if len(contour) < 5:
                 continue
+
+            all_coord.append(ell_coord)
 
         # will return list of ellipses and their respective coordinates.
         return all_coord
