@@ -15,6 +15,7 @@ from torchvision import transforms
 from newTracking import Tracking
 import time
 import os
+import matplotlib.pyplot as plt
 from classifier import Classify
 
 if torch.cuda.is_available():
@@ -85,6 +86,10 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         origImg = cv2.resize(frame, [IMAGE_SHAPE[1], IMAGE_SHAPE[0]],
                              interpolation=cv2.INTER_LINEAR)  # have to flip dimensions due to being cv2 ** uggghhh***
 
+        origImgGray = cv2.cvtColor(origImg, cv2.COLOR_RGB2GRAY)
+        origImgGray = cv2.cvtColor(origImgGray, cv2.COLOR_GRAY2RGB) ## convert to gray and back, losing color data.
+
+
         totalEllipses = []
 
         # frame = preProcess(frame)  # pre-process image
@@ -131,9 +136,15 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         totalOutputImage = onehot_to_rgb(output, cellColor2Label)
         bwImage = RGBtoBW(totalOutputImage, False) ## outputs a b/w mask from classwise segmentation. Easier than updating network and weights each time class switches. 
         bwImage = np.bitwise_not(bwImage)
+        # plt.imshow(origImgGray, interpolation='nearest')
+        # plt.show()
+        # plt.imshow(totalOutputImage, interpolation='nearest')
+        # plt.show()
+        # plt.imshow(bwImage, interpolation='nearest')
+        # plt.show()
 
         # getting ellipses for each class present
-        totalEllipses = getEllipsesFromClassListClassifier(bwImage,origImg,classificationModel, classifyList)
+        totalEllipses = getEllipsesFromClassListClassifier(bwImage,origImgGray,classificationModel, classifyList)
 
         tracker = Tracking(CurrentDict, GlobalList, totalEllipses,
                            id, pixelChange, magnification)   ## update list based on points in previous frame. 
@@ -195,17 +206,23 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
 
 
 def runMultipleVideos(rootPath, extraName, modelPath, classifyModelPath):
-    videoList = os.listdir(rootPath)
+    dirlist = os.listdir(rootPath)
+    videoList = []
+
+    for file in dirlist:
+        if file[-4:] == '.mp4': ## ensuring only videos get inferences
+            videoList.append(file)
+
     for video in videoList:
         videoName = video[:-4]
 
-        saveImagePath = rootPath + str(videoName) + extraName + '/'
+        saveImagePath = rootPath + 'Output/' + str(videoName) + extraName + '/'
         doesPathExist = os.path.exists(saveImagePath)
 
         if doesPathExist == False:
             os.mkdir(saveImagePath)
         
-        saveCSVPath = rootPath + str(videoName) + extraName + '.csv'
+        saveCSVPath = rootPath + 'Output/' + str(videoName) + extraName + '.csv'
 
         videoPath = rootPath + video
 
@@ -229,14 +246,21 @@ if __name__ == '__main__':
 
     modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneModels/021123_2x_3c_Train_model.pt'
 
-    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/031623_2c_v1_shuffle10e_reducelr1000e_095_impure.pt'
+    modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneMarchModel/030723_2x_3c_PureTrainHPNEbias_v7_model.pt'
+
+    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/031623_2c_v1_shuffle10e_reducelr1000e_095_pureTest.pt'
     # videoPath = rootPath + 'DatasetFeb10/HPNE/230203121917.mp4'
     # videoPath = rootPath + \
     # 'Videos/August 2022/20um/5ul_min/25x mag/1280x960 px/5_25_1280_0.mp4'
     # magnification = 25
-    date = '_3c_test_031723_'
+    date = '_3c_test_032123_Classifier_PureTrain_Gray'
 
     # main(videoPath, saveImagePath, saveCSVPath,
         #  modelPath, magnification=magnification)
-    runMultipleVideos(rootPath + 'DatasetDec15Cells/HPNE/',date, modelPath, classifyModelPath)
-    # runMultipleVideos(rootPath + 'DatasetDec15Cells/MIA/',date, modelPath)
+    # runMultipleVideos(rootPath + 'DatasetFeb10/HPNE/',date, modelPath, classifyModelPath)
+    # runMultipleVideos(rootPath + 'DatasetFeb10/MIA/',date, modelPath, classifyModelPath)
+
+    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/HPNE/',date, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/MIA/',date, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/1_9 Ratio/',date, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/99_1 Ratio/',date, modelPath, classifyModelPath)
