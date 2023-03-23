@@ -4,7 +4,9 @@ import numpy as np
 from skimage.feature import peak_local_max
 from skimage.segmentation import watershed
 from scipy import ndimage
-from auxiliary import suppressUndesirableEllipses
+from auxiliary import suppressUndesirableEllipses, showImageDelay
+# %matplotlib inline ## for displaying in notebook
+import matplotlib.pyplot as plt
 
 
 # this function takes a one-hot output and creates B/W images for each class from the output; input should be (bs,h,w,c) or (h,w,c)
@@ -102,7 +104,41 @@ class ellipseDetection():
 
         imH, imW, channels = image.shape ## getting shape to know bounds. 
 
-        length = int(np.maximum(axes[0], axes[1]))
+
+        minor, major = axes[0], axes[1]
+
+        if (np.isnan(minor) == True):
+            minor = 0.01
+        # setting entire-box bounds that are found as non found circles
+        if (np.isinf(minor) == True):
+            minor = 0.01
+
+        if (np.isnan(major) == True):
+            major = 0.01
+        # setting entire-box bounds that are found as non found circles
+        if (np.isinf(major) == True):
+            major = 0.01
+        
+
+        if(np.isinf(x) == True):
+            x = 1
+        if(np.isnan(x) == True):
+            x = 1
+        if(np.isinf(y) == True):
+            y = 1
+        if(np.isnan(y) == True):
+            y = 1
+
+        length = int(np.maximum(major, minor)) ## ensuring thatlength is at least one.
+        if length ==0:
+            length = 1
+        
+        tenpercentlength = int(length / 5) + 1
+        length = length + tenpercentlength   ## just in case segmentation undershoots. 
+
+  
+        # print(x, length)
+        # print(y,length)
         xStart = int(x - 0.5*length)
         yStart = int(y - 0.5*length)
         xEnd = xStart + length
@@ -128,9 +164,9 @@ class ellipseDetection():
         # print(xStart, yStart,xEnd, yEnd)
 
         # print(image.shape)
-        testsegment = image[975:995,23:43,:]
+        # testsegment = image[975:995,23:43,:]
         segment = image[yStart:yEnd,xStart:xEnd,:] ## ensure axes are right. OpenCV is odd in that color channels are BGR, which makes for an intersting time. 
-        # print(segment.shape, testsegment.shape,resizeSize)
+        # print(segment.shape,resizeSize)
         segment = cv2.resize(segment, resizeSize, cv2.INTER_LINEAR)
         # print(segment.shape)
 
@@ -158,6 +194,10 @@ class ellipseDetection():
                         ell_coord[i] = 0.01
     
                 segment = self.createImageRegion(RGBimg, coord,axes,resize)   ## segmenting region cell is in. 
+                testsegment = np.array(segment)
+                # plt.imshow(testsegment, interpolation='nearest')
+                # plt.show()
+                # showImageDelay(testsegment, 1,'semgent')
                 with torch.no_grad():
                     # print(segment.shape)
                     segment = np.transpose(segment, [2, 0, 1])

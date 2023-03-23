@@ -9,7 +9,7 @@ from tracking import Tracking
 # inverted dictionary because cv2 reads
 
 
-def showImage(image, delay, text):
+def showImageDelay(image, delay, text):
     cv2.imshow(text, image)
     if delay is not None:
         cv2.waitKey(delay)

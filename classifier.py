@@ -10,6 +10,7 @@ import pandas as pd
 import cv2
 import numpy as np
 import random
+from IPython.display import clear_output
 
 if torch.cuda.is_available():
     device = 'cuda:1'
@@ -20,6 +21,50 @@ else:
 torch.manual_seed(43)
 np.random.seed(43)
 random.seed(43)
+
+
+class Classifier_v2(nn.Module):
+    def __init__(self, batchsize):
+        super(Classifier_v2, self).__init__()
+        self.batchsize = batchsize
+
+        self.conv1 = torch.nn.Conv2d(3, 6, 3)
+        self.relu = torch.nn.ReLU()
+        self.pool = torch.nn.MaxPool2d(2, 2)
+        self.conv2 = torch.nn.Conv2d(6, 12, 3)
+        self.conv3 = torch.nn.Conv2d(12, 24, 3)
+        self.fc1 = torch.nn.Linear(24 * 2 * 2, 100)
+        self.fc2 = torch.nn.Linear(100, 10)
+        self.fc3 = torch.nn.Linear(10, 2)
+
+        self.dropout = torch.nn.Dropout(0.25)
+        self.batchnorm1 = torch.nn.BatchNorm2d(6)
+        self.batchnorm2 = torch.nn.BatchNorm2d(12)
+        self.batchnorm3 = torch.nn.BatchNorm2d(24)
+
+    
+    def computeUnit(self, x, conv, batchnorm, pool, dropout):
+        x = conv(x)
+        x = batchnorm(x)
+        x = self.relu(x)
+        x = pool(x)
+        x = dropout(x)
+        return x
+
+    def forward(self, x):
+        x = self.computeUnit(x, self.conv1, self.batchnorm1, self.pool, self.dropout)
+        x = self.computeUnit(x, self.conv2, self.batchnorm2, self.pool, self.dropout)
+        x = self.computeUnit(x, self.conv3, self.batchnorm3, self.pool, self.dropout)
+
+        x = x.view(x.shape[0], -1)
+        x = self.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = self.fc3(x)
+
+        return x
+
 
 class Classify(nn.Module):
     def __init__(self, batchsize):
@@ -56,7 +101,7 @@ def createDataset(path):  #input path to folder containing train; ensure all sam
 def getDataset(path, batchsize,numsteps,isVal):
     # imgdata = createDataset(path)
     imgdata = dataGenerator(path, batchsize,numsteps,isVal)
-    loadedData = DataLoader(imgdata,batchsize,shuffle=False)
+    loadedData = DataLoader(imgdata,batchsize,shuffle=False, drop_last=True)
     return loadedData
 
 def isClass(str): ## given string, is the class contained in the name? 
@@ -221,7 +266,8 @@ def testFunction(testPath,classes, modelPath, csvSave):
 
 def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
     batchsize = 16
-    model = Classify(batchsize).to(device)
+    model = Classifier_v2(batchsize)
+    model.to(device)
     loadModel = False
 
     classes = ['HPNE', 'MIA']
@@ -256,8 +302,6 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
 
     trainValues = []
      
-
-    sm = nn.Softmax(dim=-1)
     
     for e in range(epoch, EPOCHS):
         tLoss = 0
@@ -266,10 +310,10 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
         vAcc = 0
         acc = 0
 
-        if e % 10 == 0:
-            trainDataSet, valDataSet = datasetAcquirerShuffler(sourcePath, 4800, 600) #train, val sizees respectively. 
-            trainSet = getDataset(trainDataSet,batchsize,numsteps,isVal=False)
-            valSet = getDataset(valDataSet,valbatchsize,valnumsteps,isVal=True)
+        # if e % 10 == 0:
+        #     trainDataSet, valDataSet = datasetAcquirerShuffler(sourcePath, 4800, 600) #train, val sizees respectively. 
+        #     trainSet = getDataset(trainDataSet,batchsize,numsteps,isVal=False)
+        #     valSet = getDataset(valDataSet,valbatchsize,valnumsteps,isVal=True)
 
         if e % 1000 == 0:  
             lr = lr * 0.95 ## reduce lr
@@ -335,6 +379,8 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
 
         trainValues.append([tLoss,vLoss,tAcc, vAcc])
 
+        clear_output(wait=True)
+
         print('One epoch down! here is the loss:', tLoss, vLoss)
         print('Epoch number: ', e)
         # for loss in lossVals:
@@ -364,7 +410,7 @@ if __name__ == '__main__':
     csvSave = rootPath + 'LearnData/'
 
     modelSrc = rootPath + 'Dataset/Model/'
-    modelName = '031623_2c_v1_shuffle10e_reducelr1000e_095_pureTest'
+    modelName = '032323_2c_v2_shuffle10e_reducelr1000e_095_pureTest'
     modelPath = modelSrc + modelName +'.pt'
 
     csvSave = rootPath + 'Dataset/LearningData/' + modelName + '.csv'
