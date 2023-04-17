@@ -79,10 +79,10 @@ class Tracking():
                         # decrementing class encounter; essentially takes average class detection type
                         if numClassEncounter > 0:  # ensuring that average of class detection type is inferenced
                             classType = pt2[7]
+                            numClassEncounter = numClassEncounter - 1
                         if numClassEncounter <= 0:
                             classType = pt[7]
-
-                        numClassEncounter = numClassEncounter - 1
+                            numClassEncounter = 0
 
                         # print('decrement!')
                     if pt[7] == pt2[7]:

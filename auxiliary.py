@@ -274,7 +274,7 @@ def suppressUndesirableEllipses(ellipseList):
             avgAxes = (major + minor) 
 
             # qualifiers to look for; as configurations change, qualifiers may also change.
-            if (eccentricity > 0.6) and (avgAxes > 5):
+            if (eccentricity > 0.3) and (avgAxes > 5):  ## (4/17/23) changed eccentricity to 0.3 forom 0.6 due to causing tracking problems
                 ellipseListOutput.append(ellipse)
                 # print('i was good!', ellipse)
 

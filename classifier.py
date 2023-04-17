@@ -10,6 +10,7 @@ import pandas as pd
 import cv2
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 from IPython.display import clear_output
 
 if torch.cuda.is_available():
@@ -37,7 +38,12 @@ class Classifier_v2(nn.Module):
         self.fc2 = torch.nn.Linear(100, 10)
         self.fc3 = torch.nn.Linear(10, 2)
 
-        self.dropout = torch.nn.Dropout(0.25)
+        self.drop1 = torch.nn.Dropout(0.1)
+        self.drop2 = torch.nn.Dropout(0.2)
+        self.drop3 = torch.nn.Dropout(0.3)
+
+        self.dropFC = torch.nn.Dropout(0.5)
+
         self.batchnorm1 = torch.nn.BatchNorm2d(6)
         self.batchnorm2 = torch.nn.BatchNorm2d(12)
         self.batchnorm3 = torch.nn.BatchNorm2d(24)
@@ -52,15 +58,17 @@ class Classifier_v2(nn.Module):
         return x
 
     def forward(self, x):
-        x = self.computeUnit(x, self.conv1, self.batchnorm1, self.pool, self.dropout)
-        x = self.computeUnit(x, self.conv2, self.batchnorm2, self.pool, self.dropout)
-        x = self.computeUnit(x, self.conv3, self.batchnorm3, self.pool, self.dropout)
+        x = self.computeUnit(x, self.conv1, self.batchnorm1, self.pool, self.drop1)
+        x = self.computeUnit(x, self.conv2, self.batchnorm2, self.pool, self.drop2)
+        x = self.computeUnit(x, self.conv3, self.batchnorm3, self.pool, self.drop3)
+
+        # self.fc1 = torch.nn.Linear(24 * x.shape[2] * x.shape[3], 100)
 
         x = x.view(x.shape[0], -1)
         x = self.relu(self.fc1(x))
-        x = self.dropout(x)
+        x = self.dropFC(x)
         x = self.relu(self.fc2(x))
-        x = self.dropout(x)
+        x = self.dropFC(x)
         x = self.fc3(x)
 
         return x
@@ -263,6 +271,37 @@ def testFunction(testPath,classes, modelPath, csvSave):
 
 
 
+def rollingAverage(inputlist, window):
+    if len(inputlist) >= window:
+        while len(inputlist) > window:
+            inputlist.pop(0)
+    
+    avg = sum(inputlist) / len(inputlist)
+    return avg
+
+def plotTrain(data, isList):
+    if isList:
+        data = np.array(data)
+
+    fig, ax = plt.subplots()
+
+    
+    ax.plot(data[:,0], label = 'Train Loss')
+    ax.plot(data[:,1], label = 'Val Loss')
+
+    ax2 = ax.twinx()
+
+    ax2.plot(data[:,2], label = 'Train Accuracy')
+    ax2.plot(data[:,3], label = 'Val Accuracy')
+
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss/Accuracy')
+    plt.title('Training Loss/Accuracy')
+    plt.legend()
+    plt.show()
+
+
+
 
 def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
     batchsize = 16
@@ -301,6 +340,11 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
         print('Model Successfully Loaded')
 
     trainValues = []
+
+    rollingAvgAccTrain = []
+    rollingAvgLossTrain = []
+    rollingAvgAccVal = []
+    rollingAvgLossVal = []
      
     
     for e in range(epoch, EPOCHS):
@@ -309,6 +353,7 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
         tAcc = 0
         vAcc = 0
         acc = 0
+
 
         # if e % 10 == 0:
         #     trainDataSet, valDataSet = datasetAcquirerShuffler(sourcePath, 4800, 600) #train, val sizees respectively. 
@@ -376,12 +421,31 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
 
         # print(tAcc, batchsize, vAcc, valbatchsize)
 
+        rollingAvgAccTrain.append(tAcc)
+        rollingAvgLossTrain.append(tLoss)
+        rollingAvgAccVal.append(vAcc)
+        rollingAvgLossVal.append(vLoss)
+
+        window = 200
+
+        rTacc = rollingAverage(rollingAvgAccTrain, window)
+        rTloss = rollingAverage(rollingAvgLossTrain, window)
+        rVacc = rollingAverage(rollingAvgAccVal, window)
+        rVloss = rollingAverage(rollingAvgLossVal, window)
+
 
         trainValues.append([tLoss,vLoss,tAcc, vAcc])
 
         clear_output(wait=True)
 
+        print(len(rollingAvgAccTrain))
+
+        plotTrain(trainValues, True)
+
         print('One epoch down! here is the loss:', tLoss, vLoss)
+        print('Here is the rolling average loss: {:.2f}, {:.2f}'.format(rTloss, rVloss))
+        print('Here is the accuracy: {:.2f}, {:.2f}'.format(tAcc, vAcc))
+        print('Here is the ra accuracy: {:.2f}, {:.2f}'.format(rTacc, rVacc))
         print('Epoch number: ', e)
         # for loss in lossVals:
             # print(loss)

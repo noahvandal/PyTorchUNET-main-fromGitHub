@@ -183,7 +183,7 @@ class ellipseDetection():
                 ell_coord = [cx, cy, lx, ly, angle, 1, 0]
                 coord = (cx,cy)
                 axes = (lx,ly)
-                resize = (32, 32) ## default input for the classifcation network. This value will have to be changed if network input size changes. 
+                resize = (64, 64) ## default input for the classifcation network. This value will have to be changed if network input size changes. 
 
                 # getting rid of nan and inf values
                 for i, var in enumerate(ell_coord):
