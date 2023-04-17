@@ -17,6 +17,7 @@ import time
 import os
 import matplotlib.pyplot as plt
 from classifier import Classify
+from classifierNets import Classifier_v12
 
 if torch.cuda.is_available():
     DEVICE = 'cuda:1'
@@ -27,12 +28,38 @@ else:
 IMAGE_SHAPE = (960, 1280)
 
 
+def onehotToBW(image,outputAsRGB=False):   
+    # if isTensor:
+        # print(image.shape)
+        # image = convertTensorTypeToNumpy(image)
+        # print(image.shape)
+
+    image = np.array(image)
+    image = image[0,:,:,:] ## getting rid of batch dimension
+    image = np.transpose(image, (1, 2, 0))  ## flipping for cv2 sake
+    output = np.zeros([image.shape[0], image.shape[1]])
+    output = np.expand_dims(output, axis=-1)
+    image = np.argmax(image, axis=-1, keepdims=True)
+    # print(image.shape)
+    output[np.all(image == 1, axis=-1)] = 255 ## background 
+    output[np.all(image == 0, axis=-1)] = 0 ## foreground
+    output = output.astype('uint8')
+    # print(np.sum(np.all(output == [255], axis=-1)))
+    # print(output.shape)
+    # showImage(output)
+
+    if outputAsRGB:
+        output = cv2.cvtColor(output, cv2.COLOR_GRAY2RGB)
+
+    # showImage(output)
+    return output
+
 def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, magnification):
 
     headerFile = ['ID', 'Coordinates', 'Axes Length', 'Number of Frames Present',
                   'Average Speed (px)', 'Identity', 'Number of frames as identity', 'Diameter']  # data for csv output
 
-    model = UNET(in_channels=3, classes=3)
+    model = UNET(in_channels=3, classes=2)
     checkpoint = torch.load(modelPath, map_location=torch.device(DEVICE))
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
@@ -44,7 +71,8 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
     """
     The following section of code is for the classification network, if present. 
     """
-    classificationModel = Classify(1) ## batch size of 1
+    # classificationModel = Classify(1) ## batch size of 1
+    classificationModel = Classifier_v12()
     checkpoint = torch.load(classifyModelPath)
     classificationModel.load_state_dict(checkpoint['model_state_dict'])
 
@@ -133,8 +161,10 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         '''
 
         # getting actual color mapping of all classes present
-        totalOutputImage = onehot_to_rgb(output, cellColor2Label)
-        bwImage = RGBtoBW(totalOutputImage, False) ## outputs a b/w mask from classwise segmentation. Easier than updating network and weights each time class switches. 
+        # totalOutputImage = onehot_to_rgb(output, cellColor2Label)
+        # bwImage = RGBtoBW(totalOutputImage, False) ## outputs a b/w mask from classwise segmentation. Easier than updating network and weights each time class switches. 
+        # bwImage = np.bitwise_not(bwImage)
+        bwImage = onehotToBW(output)
         bwImage = np.bitwise_not(bwImage)
         # plt.imshow(origImgGray, interpolation='nearest')
         # plt.show()
@@ -159,7 +189,9 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         pixelChange = (pixelChange*iterator + changeinpixel) / iterator
 
         # print(CurrentDict)
-        imgs = putEllipsesOnImage(totalOutputImage, CurrentDict, magnification)
+        bwImage = np.bitwise_not(bwImage)
+        bwImage = cv2.cvtColor(bwImage, cv2.COLOR_GRAY2RGB)
+        imgs = putEllipsesOnImage(bwImage, CurrentDict, magnification)
         print(origImg.shape, imgs.shape)
         saveImageOutput(origImg, imgs, str(iterator) + '_All',
                         saveImagePath, doISave=True, showOutput=False)  # ensure save is set to true to save output
@@ -244,16 +276,17 @@ if __name__ == '__main__':
     # modelPath = rootPath + \
     # 'Videos/Train Images/3D Train/FullTrainDataset/Weights/01182023_ReduceLRonPlateau_model_2xscale.pt'
 
-    modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneModels/021123_2x_3c_Train_model.pt'
+    # modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneModels/021123_2x_3c_Train_model.pt'
 
-    modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneMarchModel/030723_2x_3c_PureTrainHPNEbias_v7_model.pt'
+    # modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneMarchModel/030723_2x_3c_PureTrainHPNEbias_v7_model.pt'
+    modelPath = '/home/noahvandal/my_project_dir/my_project_env/TrainUNET/Models/041123_2c_v3_wAugs_p10.pt'
 
-    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/031623_2c_v1_shuffle10e_reducelr1000e_095_pureTest.pt'
+    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/040623_2c_v12_pureTest_Linux_drop5_noAugsSingleFolder_t3.pt'
     # videoPath = rootPath + 'DatasetFeb10/HPNE/230203121917.mp4'
     # videoPath = rootPath + \
     # 'Videos/August 2022/20um/5ul_min/25x mag/1280x960 px/5_25_1280_0.mp4'
     # magnification = 25
-    date = '_3c_test_032123_Classifier_PureTrain_Gray'
+    date = '041023_2c_v12_pureTest_Linux_drop5_noAugsSingleFolder_t3_bwSeg'
 
     # main(videoPath, saveImagePath, saveCSVPath,
         #  modelPath, magnification=magnification)
