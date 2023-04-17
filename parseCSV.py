@@ -3,14 +3,14 @@ import pandas as pd
 import csv
 import numpy as np
 
-rootPath = '/home/noahvandal/my_project_dir/my_project_env/UNET_Color/VideoInferences/Cancer Cells February 13/99_1 Ratio/'
+# rootPath = '/home/noahvandal/my_project_dir/my_project_env/UNET_Color/VideoInferences/Cancer Cells February 13/1_9 Ratio/'
 
-# rootPath = '/home/noahvandal/my_project_dir/my_project_env/UNET_Color/VideoInferences/DatasetFeb10/HPNE/'
+rootPath = '/home/noahvandal/my_project_dir/my_project_env/UNET_Color/VideoInferences/DatasetFeb10/MIA/'
+# 
 
+csvPath = rootPath + 'Output/17_April/'
 
-csvPath = rootPath + 'Output/15_April/'
-
-csvSave = rootPath + 'Output/Apr15_All_99_1Ratio.csv'
+csvSave = rootPath + 'Output/Apr17_All_MIA.csv'
 
 dirlist = os.listdir(csvPath)
 csvoutput= []

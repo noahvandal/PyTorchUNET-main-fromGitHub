@@ -3,12 +3,13 @@ import os
 
 images = []
 
-rootPath = 'C:/Users/noahv/OneDrive/NDSU Research/Microfluidic ML Device/Videos/August 2022/VideosAllTogether/20um/'
+# rootPath = 'C:/Users/noahv/OneDrive/NDSU Research/Microfluidic ML Device/Videos/August 2022/VideosAllTogether/20um/'
+rootPath = '/home/noahvandal/my_project_dir/my_project_env/UNET_Color/VideoInferences/DatasetFeb10/MIA/Output/17_April/'
 
 
-ImagePath = rootPath + '5_25_1280_1/'
+ImagePath = rootPath + '230203124209041023_2c_v12_pureTest_Linux_drop5_noAugsSingleFolder_t3_bwSeg/'
 
-saveImagePath = rootPath + '5_25_1280_1.gif'
+saveImagePath = rootPath + 'GifOutput/230203124209041023_2c_v12_pureTest_Linux_drop5_noAugsSingleFolder_t3_bwSeg.gif'
 
 imageList = os.listdir(ImagePath)
 
