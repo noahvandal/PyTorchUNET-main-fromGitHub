@@ -3,7 +3,7 @@ import numpy as np
 from dataset import rgbToOnehotSparse,rgbToOnehotNew, color2label, cellColor2Label
 from collections import namedtuple
 import csv
-from tracking import Tracking
+from PYtracking import Tracking
 
 
 # inverted dictionary because cv2 reads
@@ -241,7 +241,7 @@ def putEllipsesOnImage(image, ellipseDict, magnification):
         # print(len(ellipse))
         ellipse = ellipseDict[key]
         # print(ellipse)
-        if len(ellipse) == 9:  # in case some erroneous additions were made for specific classes
+        if len(ellipse) == 12:  # in case some erroneous additions were made for specific classes
             # print(ellipse)
             x, y = int(ellipse[0]), int(ellipse[1])
             minor, major = int(ellipse[2]/2), int(ellipse[3]/2)
@@ -267,7 +267,8 @@ def suppressUndesirableEllipses(ellipseList):
     ellipseListOutput = []
     epsilon = 0.0001  # ensure not dividing by 0
     for ellipse in ellipseList:
-        if len(ellipse) == 9:  # in case some erroneous additions were made for specific classes; how the ellipse data point are set up
+        # print(len(ellipse))
+        if len(ellipse) == 12:  # in case some erroneous additions were made for specific classes; how the ellipse data point are set up
             minor, major = int(ellipse[2]/2), int(ellipse[3]/2)
 
             eccentricity = minor / (major + epsilon)
@@ -278,7 +279,7 @@ def suppressUndesirableEllipses(ellipseList):
                 ellipseListOutput.append(ellipse)
                 # print('i was good!', ellipse)
 
-        if len(ellipse) != 8:
+        if len(ellipse) != 12:
             continue
 
     return ellipseListOutput

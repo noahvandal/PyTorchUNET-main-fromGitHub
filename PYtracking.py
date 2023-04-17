@@ -3,7 +3,7 @@ import math
 
 
 class Tracking():
-    def __init__(self, trackingDict, globalList, currentList, currentID, pixelChange, magnification):
+    def __init__(self, trackingDict, globalList, currentList, currentID, pixelChange, magnification, frameNumber):
         # how many pixels away an object must be to be considered as same ID; appropriate for 2um/min flow rate at image size 1280x960
         self.distanceThresh = 100
         # number of pixels dimensions must be within to be evaluated as same ID; measure of major/minor axes
@@ -16,6 +16,7 @@ class Tracking():
         self.currentID = currentID   # current iterator value of the ID
         self.magnification = magnification
         self.PixelChange = pixelChange
+        self.frame = frameNumber
 
     # uses regular list formatting to compare points
     # input should be two sets of ellispse coordinate / data
@@ -90,7 +91,7 @@ class Tracking():
                         # print('increment!', pt[8], pt2[8], numClassEncounter)
 
                     new_point = [pt[0], pt[1], minor,
-                                 major, pt[4], pt2[5], avgDistance, classType, numClassEncounter]
+                                 major, pt[4], pt2[5], avgDistance, classType, numClassEncounter, pt2[9], pt[9]]
 
                     avgPositionChangeList.append(distance)
 

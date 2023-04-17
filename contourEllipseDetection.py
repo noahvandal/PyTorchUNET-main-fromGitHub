@@ -173,7 +173,7 @@ class ellipseDetection():
         return segment
     
     # given list of contours, will make ellipses from them; will also send predicted ellipses to classifier network to determine class. 
-    def ellipseFromCoordsClassifier(self, contours, RGBimg, classifyNet, classList):
+    def ellipseFromCoordsClassifier(self, contours, RGBimg, classifyNet, classList, frameNumber):
         ell_coord = []
         all_coord = []
         # print(contours)
@@ -210,12 +210,21 @@ class ellipseDetection():
                     # print(classPrediction)
                     _, index = torch.max(classPrediction, dim=1) ## getting largest value for prediction output
 
+                    outputPrediction = np.array(classPrediction)
+                    # print(outputPrediction)
+                    outputPrediction = [float(outputPrediction[0][0]), float(outputPrediction[0][1])]
                     classPrediction = classList[index]
 
                     #    adding string of classtype at the end after processing for nan values
                     ell_coord.append(classPrediction)
                     # counter to determine what class was recognized most with ID
                     ell_coord.append(1)
+                    ## add on what frame number this ellipse was found in.
+                    ell_coord.append(frameNumber)
+                    ## placeholder to increment each time ellipse is found in a frame.
+                    ell_coord.append(frameNumber)
+                    ## the output probabilities
+                    ell_coord.append(outputPrediction)
                     # print(ell_coord)
 
             if len(contour) < 5:
@@ -234,10 +243,10 @@ class ellipseDetection():
 
         return ellipses
     
-    def ellipseCoordsClassifier(self, BWimg, RGBimg, classifyNet, classList):
+    def ellipseCoordsClassifier(self, BWimg, RGBimg, classifyNet, classList, frameNumber):
         labels = self.watershedSegment(BWimg)  ## get center of each region in image
         contours = self.watershedEllipseFinder(BWimg,labels)  ## find contours and fit ellipse to it. 
-        ellipses = self.ellipseFromCoordsClassifier(contours, RGBimg, classifyNet, classList)
+        ellipses = self.ellipseFromCoordsClassifier(contours, RGBimg, classifyNet, classList, frameNumber)
 
         return ellipses
 
@@ -271,11 +280,11 @@ def getEllipsesFromClassList(imageList, nameList):
 this function also has the input of the rgb source image to segment the region the cells are contained in, for proper classification. 
 '''
 
-def getEllipsesFromClassListClassifier(BWimg, RGBimg,classifyNet, classList): 
+def getEllipsesFromClassListClassifier(BWimg, RGBimg,classifyNet, classList, frameNumber): 
     ellipseCoord = ellipseDetection()
 
-    print(BWimg.shape)
-    ellipses = ellipseCoord.ellipseCoordsClassifier(BWimg,RGBimg,classifyNet,classList)  
+    # print(BWimg.shape)
+    ellipses = ellipseCoord.ellipseCoordsClassifier(BWimg,RGBimg,classifyNet,classList, frameNumber)  
     ellipses = suppressUndesirableEllipses(ellipses)  ### getting rid of any ellipses that do not fit appropriate parameters. 
 
     return ellipses

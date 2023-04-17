@@ -3,11 +3,12 @@ import math
 
 
 class Tracking():
-    def __init__(self, trackingDict, globalList, currentList, currentID, pixelChange, magnification):
+    def __init__(self, trackingDict, globalList, currentList, currentID, instantaneouspixelChange, averagepixelchange, magnification):
         # how many pixels away an object must be to be considered as same ID; appropriate for 2um/min flow rate at image size 1280x960
-        self.distanceThresh = 100
+        # self.distanceThresh = 50
+        self.distanceThresh = instantaneouspixelChange + 40
         # number of pixels dimensions must be within to be evaluated as same ID; measure of major/minor axes
-        self.dimDiffThresh = 50
+        self.dimDiffThresh = 30
         # maximum number of ID's can be separated before considered as same ID
         self.IDSepThresh = 40
         self.globalList = globalList  # list of all id's that have passed through
@@ -15,7 +16,7 @@ class Tracking():
         self.currentList = currentList  # list of ID'd objects in current frame
         self.currentID = currentID   # current iterator value of the ID
         self.magnification = magnification
-        self.PixelChange = pixelChange
+        self.PixelChange = averagepixelchange
 
     # uses regular list formatting to compare points
     # input should be two sets of ellispse coordinate / data
@@ -79,20 +80,35 @@ class Tracking():
                         # decrementing class encounter; essentially takes average class detection type
                         if numClassEncounter > 0:  # ensuring that average of class detection type is inferenced
                             classType = pt2[7]
+                            numClassEncounter = numClassEncounter - 1
                         if numClassEncounter <= 0:
                             classType = pt[7]
+                            numClassEncounter = 0
 
-                        numClassEncounter = numClassEncounter - 1
+                        # numClassEncounter = numClassEncounter - 1
 
                         # print('decrement!')
                     if pt[7] == pt2[7]:
                         numClassEncounter = numClassEncounter + 1
-                        # print('increment!', pt[8], pt2[8], numClassEncounter)
+
+                    ## update class prediction average
+                    currentAvg = pt2[11]
+                    listAvg = pt[11]
+                    # print(currentAvg, pt[11])
+                    # print(currentAvg[0], listAvg[0], currentAvg[1], listAvg[1])
+                    # print(currentAvg[0])
+                    # print(listAvg[0][0])
+                    # print(currentAvg[0])
+                    # print(currentAvg, listAvg)
+                    newAvg = [currentAvg[0] + listAvg[0], currentAvg[1] + listAvg[1]]
+                    # print(newAvg)
 
                     new_point = [pt[0], pt[1], minor,
-                                 major, pt[4], pt2[5], avgDistance, classType, numClassEncounter]
+                                 major, pt[4], pt2[5], avgDistance, classType, numClassEncounter, pt2[9], pt[9], newAvg]
 
-                    avgPositionChangeList.append(distance)
+                    if distance > 5:  ## if the is is moving at all
+                        avgPositionChangeList.append(distance)
+                    # print(distance)
 
                     # update coordinate/radius data for ID in dictionary
                     self.trackingDict[object_id] = new_point
@@ -123,11 +139,14 @@ class Tracking():
                     avgSpeed = id_val[6]
                     Identity = id_val[7]
                     numClassEncounter = id_val[8]
+                    startFrame = id_val[9]
+                    endFrame = id_val[10]
+                    classProb = id_val[11]
 
                     combine_id_data = [object_id, coord, axes,
-                                       numFrames, avgSpeed, Identity, numClassEncounter, Diameter]
+                                       numFrames, avgSpeed, Identity, numClassEncounter, Diameter, startFrame, endFrame, classProb]
                     # making sure to ignore small artifacts
-                    if (avgDiam >= 3) and (avgDiam <= 30) and (numberFrames >= 3) and ((4*avgPositionChange) >= self.PixelChange):
+                    if (avgDiam >= 3) and (avgDiam <= 30) and (numberFrames >= 3) and ((avgPositionChange) >= 3):
                         # storing data regarding beads that have left the frame.
                         self.globalList.append(combine_id_data)
                     # getting rid of unrecognized point from dictionary
@@ -140,7 +159,7 @@ class Tracking():
             numFrames = point[5] + 1
             # print(point)
             point = [point[0], point[1], point[2],
-                     point[3], point[4], numFrames, point[6], point[7], point[8]]
+                     point[3], point[4], numFrames, point[6], point[7], point[8], point[9], point[10], point[11]]
             self.trackingDict[ID] = point
 
         for pt in self.currentList:  # adding points that weren't in dicitonary to dictionary
@@ -172,12 +191,13 @@ class Tracking():
 class postVideoProcessList():
     def __init__(self, globalList):
         self.globalList = globalList
-        self.distanceThresh = 100
+        self.distanceThresh = 10
         # number of pixels dimensions must be within to be evaluated as same ID; measure of major/minor axes
-        self.dimDiffThresh = 10
+        self.dimDiffThresh = 5
+        self.frameNumberDifference = 50 ## number of frames two sightings can be apart (can also be difference in ID's)
 
         # self.arepointssimilar = self.tracker.arePointsSimilar
-    def arePointsSimilar(self, item1, item2):
+    def arePointsSimilar(self, item1, item2, absFrameDifference):
 
         isSimilar = False
 
@@ -192,7 +212,7 @@ class postVideoProcessList():
 
         # print(distance)
         # cannot simply delete entries here, because then changes size of list which will result in entries not being indexed.
-        if (distance < self.distanceThresh) and (dimDiff < self.dimDiffThresh):
+        if (distance < self.distanceThresh) and (dimDiff < self.dimDiffThresh) and (absFrameDifference <= self.frameNumberDifference):
             isSimilar = True
 
         return isSimilar
@@ -202,26 +222,46 @@ class postVideoProcessList():
         copyGlobalList = self.globalList.copy()
         tempCopyGlobal = []
         itemRemoved = False
+        absFramedim = 0
 
         for index in self.globalList:
             itemRemoved = False
 
             coord = index[1]
             axes = index[2]
+
+            startFrame = index[8]
+            endFrame = index[9]
             # necessary to parse global list format
             item = [coord[0], coord[1], axes[0], axes[1]]
 
             for index2 in copyGlobalList:
                 coord2 = index2[1]
                 axes2 = index2[2]
+
+                startFrame2 = index2[8]
+                endFrame2 = index2[9]
+
                 # necessary to parse global list format
                 item2 = [coord2[0], coord2[1], axes2[0], axes2[1]]
 
+                ## finding frame difference between two points
+                diff1 = np.abs(startFrame - endFrame2)
+                diff2 = np.abs(endFrame - startFrame2)
+
+                ## in case the points are equal (corresponding to same id)
+                # if diff1 == diff2:
+                #     absFramedim = 0
+                # else:
+                #     absFramedim = np.min([diff1, diff2])
+                absFramedim = np.absolute([index[0] - index2[0]])
+
                 similar = False
-                similar = self.arePointsSimilar(item, item2)
+                similar = self.arePointsSimilar(item, item2, absFramedim)
 
                 if similar:
                     itemRemoved = True
+                    # break
                 if not similar:
                     tempCopyGlobal.append(index2)
 

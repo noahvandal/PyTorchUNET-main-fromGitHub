@@ -1,6 +1,7 @@
 from preProcess import preProcess
 from contourEllipseDetection import ellipseDetection, processOneHotIntoClassBW, getEllipsesFromClassList, getEllipsesFromClassListClassifier
-from tracking import Tracking, postVideoProcessList
+# from PYtracking import Tracking, postVideoProcessList
+# from PYtracking import postVideoProcessList
 import torch
 import cv2
 import csv
@@ -12,7 +13,7 @@ from auxiliary import saveImageOutput, putEllipsesOnImage, suppressUndesirableEl
 from dataset import cellColor2Label, color2label, outputClassImages, RGBtoBW
 from evaluate import onehot_to_rgb
 from torchvision import transforms
-from newTracking import Tracking
+from newTracking import Tracking, postVideoProcessList
 import time
 import os
 import matplotlib.pyplot as plt
@@ -57,7 +58,7 @@ def onehotToBW(image,outputAsRGB=False):
 def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, magnification):
 
     headerFile = ['ID', 'Coordinates', 'Axes Length', 'Number of Frames Present',
-                  'Average Speed (px)', 'Identity', 'Number of frames as identity', 'Diameter']  # data for csv output
+                  'Average Speed (px)', 'Identity', 'Number of frames as identity', 'Diameter', 'Start Frame', 'End Frame', 'Class Prob']  # data for csv output
 
     model = UNET(in_channels=3, classes=2)
     checkpoint = torch.load(modelPath, map_location=torch.device(DEVICE))
@@ -91,6 +92,7 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
     # magnification = 25
 
     pixelChange = 1  # just tracking movement of pixels through frames
+    changeinpixel = 0
     magnification = 25  # should be set for entire frame
 
     # loop for each frame
@@ -174,14 +176,21 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         # plt.show()
 
         # getting ellipses for each class present
-        totalEllipses = getEllipsesFromClassListClassifier(bwImage,origImgGray,classificationModel, classifyList)
+        totalEllipses = getEllipsesFromClassListClassifier(bwImage,origImgGray,classificationModel, classifyList, iterator)
+
+        
+        # print(totalEllipses)
+        # placeholdellipse = totalEllipses.copy()
+        # print(pixelChange)
+        # print(len(totalEllipses))
 
         tracker = Tracking(CurrentDict, GlobalList, totalEllipses,
-                           id, pixelChange, magnification)   ## update list based on points in previous frame. 
+                           id, changeinpixel, pixelChange, magnification)   ## update list based on points in previous frame. 
 
         CurrentDict, id, GlobalList, _, changeinpixel = tracker.comparePointsList()
 
         # GlobalList.extend(outOfFrameList)
+        # print(changeinpixel)
         # print('global list', GlobalList)
         # print('pixel change', changeinpixel)
 
@@ -192,18 +201,34 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         bwImage = np.bitwise_not(bwImage)
         bwImage = cv2.cvtColor(bwImage, cv2.COLOR_GRAY2RGB)
         imgs = putEllipsesOnImage(bwImage, CurrentDict, magnification)
-        print(origImg.shape, imgs.shape)
+        # print(origImg.shape, imgs.shape)
         saveImageOutput(origImg, imgs, str(iterator) + '_All',
                         saveImagePath, doISave=True, showOutput=False)  # ensure save is set to true to save output
 
         # print('Global List Before', GlobalList)
+        # listcompare = postVideoProcessList(GlobalList)
+        # GlobalList = listcompare.SingleComparePointsGlobal()
+        # GlobalList = removeSimilar(GlobalList)
+
+        clear_output(wait=True)
+        # print(len(totalEllipses))
+        # for entry in CurrentDict:
+        #     print(entry, CurrentDict[entry])
+        # for entry in GlobalList:
+            # print(entry)
         listcompare = postVideoProcessList(GlobalList)
         GlobalList = listcompare.SingleComparePointsGlobal()
+        # print('Global List')
+        # for entry in GlobalList:
+            # print(entry)
         # print('Global List', GlobalList)
 
         endFrame = time.time()
 
-        clear_output(wait=True)
+        # if iterator == 133:  ## incase i want to stop at a certain frame
+            # break
+
+        # clear_output(wait=True)
         stdout.flush()
         print('Frame Number: ', iterator)
         print('Frame Time: ', endFrame-startFrame)
@@ -227,6 +252,7 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         write = csv.writer(csvwriter)
         write.writerow(headerFile)
         write.writerows(GlobalList)
+    
 
     src.release()
     # cv2.destroyAllWindows()
@@ -237,7 +263,7 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
 
 
 
-def runMultipleVideos(rootPath, extraName, modelPath, classifyModelPath):
+def runMultipleVideos(rootPath, extraName,dateFolder, modelPath, classifyModelPath):
     dirlist = os.listdir(rootPath)
     videoList = []
 
@@ -245,16 +271,16 @@ def runMultipleVideos(rootPath, extraName, modelPath, classifyModelPath):
         if file[-4:] == '.mp4': ## ensuring only videos get inferences
             videoList.append(file)
 
-    for video in videoList:
+    for i, video in enumerate(videoList):
         videoName = video[:-4]
 
-        saveImagePath = rootPath + 'Output/' + str(videoName) + extraName + '/'
+        saveImagePath = rootPath + 'Output/' + dateFolder + str(videoName) + extraName + '/'
         doesPathExist = os.path.exists(saveImagePath)
 
         if doesPathExist == False:
             os.mkdir(saveImagePath)
         
-        saveCSVPath = rootPath + 'Output/' + str(videoName) + extraName + '.csv'
+        saveCSVPath = rootPath + 'Output/' + dateFolder + str(videoName) + extraName + '.csv'
 
         videoPath = rootPath + video
 
@@ -262,7 +288,9 @@ def runMultipleVideos(rootPath, extraName, modelPath, classifyModelPath):
 
         magnification = 25
 
+        # if i == 0:
         main(videoPath, saveImagePath, saveCSVPath, modelPath,classifyModelPath, magnification)
+
 
 
 if __name__ == '__main__':
@@ -286,14 +314,16 @@ if __name__ == '__main__':
     # videoPath = rootPath + \
     # 'Videos/August 2022/20um/5ul_min/25x mag/1280x960 px/5_25_1280_0.mp4'
     # magnification = 25
-    date = '041023_2c_v12_pureTest_Linux_drop5_noAugsSingleFolder_t3_bwSeg'
+    name = '041023_2c_v12_pureTest_Linux_drop5_noAugsSingleFolder_t3_bwSeg'
+
+    dateFolder = '17_April/'
 
     # main(videoPath, saveImagePath, saveCSVPath,
         #  modelPath, magnification=magnification)
     # runMultipleVideos(rootPath + 'DatasetFeb10/HPNE/',date, modelPath, classifyModelPath)
     # runMultipleVideos(rootPath + 'DatasetFeb10/MIA/',date, modelPath, classifyModelPath)
 
-    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/HPNE/',date, modelPath, classifyModelPath)
-    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/MIA/',date, modelPath, classifyModelPath)
-    runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/1_9 Ratio/',date, modelPath, classifyModelPath)
-    runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/99_1 Ratio/',date, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/HPNE/',name, dateFolder, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/MIA/',name, dateFolder, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/1_9 Ratio/',name, dateFolder, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/99_1 Ratio/',name, dateFolder, modelPath, classifyModelPath)
