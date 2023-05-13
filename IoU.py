@@ -17,12 +17,6 @@ csvSave = rootPath + testIdentifier + '.csv'
 
 imgList = os.listdir(imgDir)
 
-# imgSelect = random.choice(imgList)
-
-# imgPath = imgDir + imgSelect
-# maskPath = maskDir + imgSelect
-
-# print(imgSelect)
 
 roiData = []
 percentData = []
@@ -32,8 +26,6 @@ isConcat = True ## if the mask output has input side by side.
 for i, img in enumerate(imgList):
     imgPath = imgDir + img
     maskPath = maskDir + img
-    # print(imgPath)
-    # print(maskPath)
 
     imgName = img[:-4]
 
@@ -44,8 +36,6 @@ for i, img in enumerate(imgList):
 
     percentAvg = np.array(percentData)
     percentAvg = np.average(percentAvg, axis=0)
-    # print(percentAvg)
-    print(ClassIou,totalIou)
 
     roiData.append([imgName, ClassIou[0], ClassIou[1],
                    ClassIou[2],totalIou])
@@ -55,9 +45,5 @@ for i, img in enumerate(imgList):
         np.savetxt(csvSave, roiarray, fmt="%s", delimiter=',',
                    header='ImgName,HPNE IoU,MIA IoU,Background IoU,Total IoU')
 
-    # print(roiData)
     if i % 10 == 0:
         print(i)
-
-# np.savetxt(csvSave, roiData, delimiter=',',
-    #    header='ImgName,HPNE IoU,MIA IoU,PS IoU,Background IoU,Total IoU')

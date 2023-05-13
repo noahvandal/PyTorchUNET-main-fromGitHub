@@ -3,6 +3,8 @@ import torch.optim as optim
 from torchvision import transforms
 from PIL import Image
 from dataset import *
+from model import * 
+import torch.nn as nn
 
 # select device to run on
 if torch.cuda.is_available():

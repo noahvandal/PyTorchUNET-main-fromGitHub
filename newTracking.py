@@ -5,7 +5,6 @@ import math
 class Tracking():
     def __init__(self, trackingDict, globalList, currentList, currentID, instantaneouspixelChange, averagepixelchange, magnification):
         # how many pixels away an object must be to be considered as same ID; appropriate for 2um/min flow rate at image size 1280x960
-        # self.distanceThresh = 50
         self.distanceThresh = instantaneouspixelChange + 40
         # number of pixels dimensions must be within to be evaluated as same ID; measure of major/minor axes
         self.dimDiffThresh = 30
@@ -31,10 +30,7 @@ class Tracking():
             index[0]-index2[0], index[1]-index2[1])
         dimDiff = np.absolute(
             ((index[2] - index2[2])/2) + ((index[3] - index2[3])/2)/2)
-        # IDSep = np.absolute(item1[0]-item2[0]) ## for using dictionary, cannot use this metric
 
-        # print(distance)
-        # cannot simply delete entries here, because then changes size of list which will result in entries not being indexed.
         if (distance < self.distanceThresh) and (dimDiff < self.dimDiffThresh):
             isSimilar = True
 
@@ -44,12 +40,11 @@ class Tracking():
     def comparePointsList(self):
         add_count = 0
         remove_from_list = True  # generally set to true.
+
         # the threshold for how close points can be between frames for single object classification, and the current ID number in use (to prevent overlap))
         tracking_dict_copy = self.trackingDict.copy()
         current_list_copy = self.currentList.copy()
-        # current_list_copy = list(filter(None, current_list_copy))
         point_list = []
-        # print(current_list)
 
         avgPositionChangeList = []
         avgPositionChange = 0
@@ -57,14 +52,14 @@ class Tracking():
         for object_id, pt2 in tracking_dict_copy.items():
             object_exists = False
             for pt in current_list_copy:
-                # distance = math.hypot(pt2[0] - pt[0], pt2[1] - pt[1])
 
                 # Update IDs position
                 isSimilar, distance = self.arePointsSimilar(pt, pt2)
                 if isSimilar:
-                    # tracking_objects2[object_id] = tracking_objects[object_id]
+                    ## what class is the item in current frame?
                     classType = pt[7]
 
+                    ## update axes values with a markov chain weight
                     markov_weight = 0.7  # weight to assign to previous value
                     # weight past values to create markov average
                     minor = (1-markov_weight)*pt2[2] + markov_weight*pt[2]
@@ -72,12 +67,11 @@ class Tracking():
                     major = (1-markov_weight)*pt2[3] + markov_weight*pt[3]
 
                     # finding the average number of pixels each point travels
-                    # (numFrame*avgdistance + distance / totalnumFrames)
                     avgDistance = (pt2[5] * pt2[6] + distance) / (pt2[5] + 1)
                     numClassEncounter = pt2[8]
 
                     if pt[7] != pt2[7]:
-                        # decrementing class encounter; essentially takes average class detection type
+                        # decrementing class encounter; essentially takes average class detection type; if assigned class has cumulative score of less than previous class, then class is changed
                         if numClassEncounter > 0:  # ensuring that average of class detection type is inferenced
                             classType = pt2[7]
                             numClassEncounter = numClassEncounter - 1
@@ -94,26 +88,22 @@ class Tracking():
                     ## update class prediction average
                     currentAvg = pt2[11]
                     listAvg = pt[11]
-                    # print(currentAvg, pt[11])
-                    # print(currentAvg[0], listAvg[0], currentAvg[1], listAvg[1])
-                    # print(currentAvg[0])
-                    # print(listAvg[0][0])
-                    # print(currentAvg[0])
-                    # print(currentAvg, listAvg)
+
                     newAvg = [currentAvg[0] + listAvg[0], currentAvg[1] + listAvg[1], listAvg[0], listAvg[1]]
                     # print(newAvg)
 
+                    # jsut creating a new point to append to new list
                     new_point = [pt[0], pt[1], minor,
                                  major, pt[4], pt2[5], avgDistance, classType, numClassEncounter, pt2[9], pt[9], newAvg]
 
-                    if distance > 5:  ## if the is is moving at all
+                    if distance > 5:  ## if the object is is moving at all
                         avgPositionChangeList.append(distance)
-                    # print(distance)
 
                     # update coordinate/radius data for ID in dictionary
                     self.trackingDict[object_id] = new_point
                     object_exists = True
-                    # addding point to denote that it was detected as ID'ed from current list
+
+                    # addding point to denote that it was detected as ID'ed from current list; removing it from list of available points
                     point_list.append(pt)
                     if pt in self.currentList:
                         self.currentList.remove(pt)
@@ -145,19 +135,23 @@ class Tracking():
 
                     combine_id_data = [object_id, coord, axes,
                                        numFrames, avgSpeed, Identity, numClassEncounter, Diameter, startFrame, endFrame, classProb[0], classProb[1]]
-                    # making sure to ignore small artifacts
+                    
+                    # making sure to ignore small artifacts detected
                     if (avgDiam >= 3) and (avgDiam <= 30) and (numberFrames >= 3) and ((avgPositionChange) >= 3):
                         # storing data regarding beads that have left the frame.
                         self.globalList.append(combine_id_data)
-                    # getting rid of unrecognized point from dictionary
+
+                    # getting rid of unrecognized point from dictionary, since it is no longer in frame. 
                     self.trackingDict.pop(object_id)
                     print('i popped:', object_id)
 
+        
+        ## if object in current frame is not in dictionary, add it to dictionary
         for ID in self.trackingDict:  # updating number of frames for each dictionary addition
             point = self.trackingDict[ID]
+
             # increment the number of frames that has been completed for each point in tracking dictionary
             numFrames = point[5] + 1
-            # print(point)
             point = [point[0], point[1], point[2],
                      point[3], point[4], numFrames, point[6], point[7], point[8], point[9], point[10], point[11]]
             self.trackingDict[ID] = point
@@ -169,8 +163,7 @@ class Tracking():
 
         if len(current_list_copy) == 0:
             self.trackingDict.clear()  # just in case there are stored keys
-#             current_list = []
-        # print(tracking_dict)
+
 
         # finding average flow rate
         if (len(avgPositionChangeList) != 0):
@@ -192,6 +185,7 @@ class postVideoProcessList():
     def __init__(self, globalList):
         self.globalList = globalList
         self.distanceThresh = 10
+
         # number of pixels dimensions must be within to be evaluated as same ID; measure of major/minor axes
         self.dimDiffThresh = 5
         self.frameNumberDifference = 50 ## number of frames two sightings can be apart (can also be difference in ID's)
@@ -245,15 +239,7 @@ class postVideoProcessList():
                 # necessary to parse global list format
                 item2 = [coord2[0], coord2[1], axes2[0], axes2[1]]
 
-                ## finding frame difference between two points
-                diff1 = np.abs(startFrame - endFrame2)
-                diff2 = np.abs(endFrame - startFrame2)
 
-                ## in case the points are equal (corresponding to same id)
-                # if diff1 == diff2:
-                #     absFramedim = 0
-                # else:
-                #     absFramedim = np.min([diff1, diff2])
                 absFramedim = np.absolute([index[0] - index2[0]])
 
                 similar = False

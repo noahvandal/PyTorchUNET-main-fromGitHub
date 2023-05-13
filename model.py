@@ -7,7 +7,7 @@ class UNET(nn.Module):
     def __init__(self, in_channels=3, classes=3):
         super(UNET, self).__init__()  # super will inherit parent attributes
 
-        scaleFactor = 2  # this scale factor is what is used to determine size of model; it adjusts number of filters in each layer
+        scaleFactor = 2  # this scale factor is what is used to determine size of model; it adjusts number of filters in each layer. 2 is what I used for the model 
 
         self.layers = [in_channels, int(scaleFactor*8), int(scaleFactor*16), int(
             scaleFactor*32), int(scaleFactor*64), int(scaleFactor*128)]
@@ -46,6 +46,7 @@ class UNET(nn.Module):
         for upTrans, doubleConvUp, concatLayer in zip(self.upTrans, self.doubleConvUp, concatLayers):
             x = upTrans(x)
             if x.shape != concatLayer.shape:
+                ## reshape x to match concatLayer shape for upsampling
                 x = TF.resize(x, concatLayer.shape[2:])
 
             concatenate = torch.cat((concatLayer, x), dim=1)

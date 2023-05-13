@@ -1,11 +1,8 @@
-from model import UNET
 import torch
-import torch.nn as nn
 from collections import namedtuple
 import os
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from torchvision import transforms
-import PIL
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
@@ -126,10 +123,6 @@ def trainFunction(data, model, optimizer, lossFunction, device):
 
         predictions = model(X)
 
-        # print(predictions.shape, y.shape)
-        # maxpred = predictions.detach().clone()
-        # print("predictions: ", np.argmax(np.array(maxpred), axis=1))
-
         loss = lossFunction(predictions, y)
         optimizer.zero_grad()
         loss.backward()
@@ -137,23 +130,6 @@ def trainFunction(data, model, optimizer, lossFunction, device):
 
     return loss.item()
 
-
-def rgbToOnehotOld(rgb, colorDict):
-    shape = rgb.shape[:2]
-    # print('shape shape', shape)
-    arr = np.zeros(shape, dtype=np.int16)
-
-    W = np.power(256, [[0], [1], [2]])
-    img_id = rgb.dot(W).squeeze(-1)
-    values = np.unique(img_id)
-
-    for i, c in enumerate(values):
-        try:
-            arr[img_id == c] = colorDict[i][7]
-        except:
-            pass
-
-    return arr
 
 
 def rgbToOnehotNew(rgb, colorDict):
@@ -163,11 +139,14 @@ def rgbToOnehotNew(rgb, colorDict):
         color = np.array(color)
         pixel = np.zeros(len(colorDict.keys()))
         pixel[label] = 1 ## converting to one-hot encoding instead of sparse.
+
+        ## for each class present, match the color and set the pixel to the class label
         if label < len(colorDict.keys()):
             dense[np.all(rgb == color, axis=-1)] = pixel
 
     return dense
 
+## instead of usign one-hot encoding, use sparse encoding
 def rgbToOnehotSparse(rgb, colorDict):
     rgb = np.array(rgb).astype('int32')
     dense = np.zeros(rgb.shape[:2])
@@ -177,19 +156,6 @@ def rgbToOnehotSparse(rgb, colorDict):
             dense[np.all(rgb == color, axis=-1)] = label
 
     return dense
-
-def onehot_to_rgb_dataset(onehot, color_dict):
-    onehot = np.array(onehot)
-    # print(onehot)
-    # single_layer = np.argmax(onehot, axis=0)
-    # print(single_layer)
-    onehot = np.transpose(onehot, [1, 2, 0])
-    output = np.zeros(onehot.shape[0:2]+(3,))
-    for i, k in enumerate(color_dict.keys()):
-        # print(onehot.shape, output.shape, i, k)
-        if i < len(color_dict.keys()):
-            output[np.all(onehot == i, axis=2)] = k
-    return np.uint8(output)
 
 
 def outputClassImages(onehot, color_dict):
@@ -207,13 +173,12 @@ def outputClassImages(onehot, color_dict):
             totalOutput[np.all(onehot == i, axis=2)] = k
             output[np.all(onehot == i, axis=-1)] = 255
             outputList.append(output)
-    # print(output)
-    # totalOutput = np.concatenate(np.array(outputList), axis=-1)
+
     outputList.append(totalOutput)
     return outputList
 
 
-## instead of modifying class based output, will simply convert to bw whenever a non-background class is present. 
+## instead of modifying class based output, will simply convert to bw whenever a non-background class is present. Used this when transferring from MC to binary
 def RGBtoBW(image, isGrayscale=False):
     image = image.astype('uint8')
     bw = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY).astype('uint8')

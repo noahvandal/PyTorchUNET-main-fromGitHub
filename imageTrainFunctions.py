@@ -1,6 +1,6 @@
 import cv2
 
-
+## saving each output frame of a video as a png
 def saveEachFrame(video, savepath, videoname):
     src = cv2.VideoCapture(video)
 

@@ -107,7 +107,6 @@ def createDataset(path):  #input path to folder containing train; ensure all sam
     return allpaths
 
 def getDataset(path, batchsize,numsteps,isVal):
-    # imgdata = createDataset(path)
     imgdata = dataGenerator(path, batchsize,numsteps,isVal)
     loadedData = DataLoader(imgdata,batchsize,shuffle=False, drop_last=True)
     return loadedData
@@ -115,10 +114,8 @@ def getDataset(path, batchsize,numsteps,isVal):
 def isClass(str): ## given string, is the class contained in the name? 
     stringClass = ""
     if "HPNE"  in str:
-        # stringClass = 'HPNE'
         stringClass = [1,0]
     if 'MIA' in str:
-        # stringClass = 'MIA'
         stringClass = [0,1]
     return stringClass
 
@@ -247,10 +244,9 @@ def testFunction(testPath,classes, modelPath, csvSave):
             label = label.to(device)
             outputs = model(img)
         
-        # print(outputs, label)
         _, index = torch.max(outputs, dim=1)
         _,labelIndex = torch.max(label, dim=1) 
-        # print('train inaccuracy')
+
         ## see whether each image was correct or not. 
         acc, comparelist = checkAccuracy(index,labelIndex,classes, printOutput = False)
 
@@ -354,12 +350,7 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
         vAcc = 0
         acc = 0
 
-
-        # if e % 10 == 0:
-        #     trainDataSet, valDataSet = datasetAcquirerShuffler(sourcePath, 4800, 600) #train, val sizees respectively. 
-        #     trainSet = getDataset(trainDataSet,batchsize,numsteps,isVal=False)
-        #     valSet = getDataset(valDataSet,valbatchsize,valnumsteps,isVal=True)
-
+        ## manual weight decay
         if e % 1000 == 0:  
             lr = lr * 0.95 ## reduce lr
             optimizer = optim.Adam(model.parameters(), lr, betas=(0.9,0.999))
@@ -372,18 +363,16 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
             inputs = inputs.to(device)
             label = label.to(device)
             outputs = model(inputs)
-            # outputs = outputs.detach().cpu()
 
-            # print(outputs, label)
             loss = criterion(outputs, label)
             loss.backward()
             optimizer.step() ## decay if necessary for adam
             tLoss += loss
             outLoss, index = torch.max(outputs, dim=1)
             _,labelIndex = torch.max(label, dim=1)
-            # print('train inaccuracy')
+
+            ## finding train accuracy
             acc, _ = checkAccuracy(index,labelIndex,classes, printOutput = False)
-            # print(acc)
             tAcc += acc
         
         tAcc = tAcc / (i + 1)
@@ -395,37 +384,27 @@ def trainFunction(trainPath, valPath, sourcePath, modelPath, csvSave):
             inputs = inputs.to(device)
             label = label.to(device)
             outputs = model(inputs)
-            # outputs = outputs.detach().cpu()
 
-            # outputs = nn.Softmax(dim=0)(outputs)
             vLoss += criterion(outputs, label)
-            # outLoss = sm(outputs)
             outLoss, index = torch.max(outputs, dim=1)
             _,labelIndex = torch.max(label, dim=1)
-            # print(index, labelIndex)
+
+            ## finding val accuracy
             acc, _ = checkAccuracy(index,labelIndex,classes, printOutput = False)
-            # print(acc)
             vAcc += acc
         
         vAcc = vAcc / (i + 1)
 
         tLoss = tLoss.cpu().detach().numpy()
         vLoss = vLoss.cpu().    detach().numpy()
-        # tAcc = tAcc.detach().numpy()
-        # vAcc = vAcc.detach().numpy()
-        # print(tAcc, batchsize, vAcc, valbatchsize)
 
-        
-        # tAcc = tAcc / batchsize
-        # vAcc = vAcc / valbatchsize
-
-        # print(tAcc, batchsize, vAcc, valbatchsize)
 
         rollingAvgAccTrain.append(tAcc)
         rollingAvgLossTrain.append(tLoss)
         rollingAvgAccVal.append(vAcc)
         rollingAvgLossVal.append(vLoss)
 
+        ## getting rolling average accuracy of last n epochs
         window = 200
 
         rTacc = rollingAverage(rollingAvgAccTrain, window)

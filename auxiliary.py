@@ -6,9 +6,6 @@ import csv
 from PYtracking import Tracking
 
 
-# inverted dictionary because cv2 reads
-
-
 def showImageDelay(image, delay, text):
     cv2.imshow(text, image)
     if delay is not None:
@@ -20,9 +17,6 @@ def showImageDelay(image, delay, text):
 
 def saveImage(image, imageName, savePath, secondImage=False):
     imageSavePath = savePath + imageName + '.png'
-    print(imageSavePath)
-
-    # print(image.shape, secondImage.shape)
 
     if secondImage is not False:
         image = scaleImage(image)
@@ -36,33 +30,25 @@ def saveImage(image, imageName, savePath, secondImage=False):
 
 
 def stackImages(img1, img2):  # both images must be input as numpy array dtype
-    # img1 dimensions will be dimensions used
     h, w, _ = img1.shape
 
     if (img2.shape[0] != h) or (img2.shape[1] != w):
         cv2.resize(img2, (h, w))
 
-    # print('im2', img2.shape)
-    # print(img2)
-
     if len(img2.shape) == 2:
         img2 = np.expand_dims(img2, axis=-1)
         img2 = np.float32(img2)
-        # print(img2.shape)
-        # print(img2.dtype)
-        # if is single channel grayscale, conver to rgb for concatenation and better saving.
+
+        # if is single channel grayscale, convert to rgb for concatenation and better saving.
         img2 = cv2.cvtColor(img2, cv2.COLOR_GRAY2RGB)
 
     outimage = np.hstack([img1, img2])
-
-    # showImage(outimage, 1500, None)
 
     return outimage
 
 
 def scaleImage(image):
     maxPixel = np.max(image)
-    # print(maxPixel)
     if maxPixel > 1:  # if a pixel value is greater than 1, then it is not normalized and is in range 0-255 most likely
         image = image
     else:
@@ -84,36 +70,25 @@ def determineROI(img, mask, isConcat = False, path=True, isPSBead=False):
             mask = mask[:,-1280:,:]
 
     # get color labels to create sparse matrix for easy compare
-    # print(img.shape,mask.shape)
     img = rgbToOnehotSparse(img, cellColor2Label)
     mask = rgbToOnehotSparse(mask, cellColor2Label)
 
-    # print(np.sum(img == 0), np.sum(mask==0))
-    # print(np.sum(img == 1), np.sum(mask==1))
-    # print(np.sum(img == 2), np.sum(mask==2))
-    # print(img, mask)
-    # print(img.shape, mask.shape)
-
     HPNEoverlap = np.sum(np.logical_and(img == 0, mask == 0))
-    HPNEunion = np.sum(np.logical_or(img == 0, mask == 0)) + \
-        1  # +1 to ensure no attempted division by 0
+    HPNEunion = np.sum(np.logical_or(img == 0, mask == 0)) 
 
     MIAoverlap = np.sum(np.logical_and(img == 1, mask == 1))
-    MIAunion = np.sum(np.logical_or(img == 1, mask == 1)) + \
-        1  # +1 to ensure no attempted division by 0
+    MIAunion = np.sum(np.logical_or(img == 1, mask == 1)) 
 
-    # BGoverlap = np.sum(np.logical_and(img == 2, mask == 2))
-    # BGunion = np.sum(np.logical_or(img == 2, mask == 2)) + \
-        # 1  # +1 to ensure no attempted division by 0
 
+
+    ## two sepearate datasets, one with PS beads, one without
+    
     if isPSBead:
         PSoverlap = np.sum(np.logical_and(img == 2, mask == 2))
-        PSunion = np.sum(np.logical_or(img == 2, mask == 2)) + \
-            1  # +1 to ensure no attempted division by 0
+        PSunion = np.sum(np.logical_or(img == 2, mask == 2)) 
 
         BGoverlap = np.sum(np.logical_and(img == 3, mask == 3))
-        BGunion = np.sum(np.logical_or(img == 3, mask == 3)) + \
-            1  # +1 to ensure no attempted division by 0
+        BGunion = np.sum(np.logical_or(img == 3, mask == 3)) 
 
         PSIoU = PSoverlap/PSunion
 
@@ -125,18 +100,15 @@ def determineROI(img, mask, isConcat = False, path=True, isPSBead=False):
         RoIAcc = (HPNEoverlap + MIAoverlap + PSoverlap + BGoverlap) / \
             (HPNEunion + MIAunion + PSunion + BGunion)
 
-        # print(RoIAcc)
 
         ClassIoU = [HPNEIoU, MIAIoU, PSIoU, BGIoU]
 
-        # print(ClassIoU)
 
         return ClassIoU, RoIAcc
 
     else:
         BGoverlap = np.sum(np.logical_and(img == 2, mask == 2))
-        BGunion = np.sum(np.logical_or(img == 2, mask == 2)) + \
-            1  # +1 to ensure no attempted division by 0
+        BGunion = np.sum(np.logical_or(img == 2, mask == 2)) 
 
         HPNEIoU = HPNEoverlap/HPNEunion
         MIAIoU = MIAoverlap/MIAunion
@@ -145,34 +117,19 @@ def determineROI(img, mask, isConcat = False, path=True, isPSBead=False):
         RoIAcc = (HPNEoverlap + MIAoverlap + BGoverlap) / \
             (HPNEunion + MIAunion + BGunion)
 
-        # print(RoIAcc)
 
         ClassIoU = [HPNEIoU, MIAIoU, BGIoU]
 
-        # print(ClassIoU)
 
         return ClassIoU, RoIAcc
 
-    HPNEIoU = HPNEoverlap/HPNEunion
-    MIAIoU = MIAoverlap/MIAunion
-    PSIoU = PSoverlap/PSunion
-    BGIoU = BGoverlap/BGunion
-
-    RoIAcc = (HPNEoverlap + MIAoverlap + PSoverlap + BGoverlap) / \
-        (HPNEunion + MIAunion + PSunion + BGunion)
-
-    # print(RoIAcc)
-
-    ClassIoU = [HPNEIoU, MIAIoU, PSIoU, BGIoU]
-
-    return ClassIoU, RoIAcc
 
 
 def whatPercentIsClass(imgpath):
     img = cv2.imread(imgpath)
-    # get color labels to create sparse matrix for easy compare
     img = rgbToOnehotSparse(img, color2label)
 
+    ## based on dictionary values
     HPNEpix = np.sum(img == 0)
     MIApix = np.sum(img == 1)
     PSpix = np.sum(img == 3)
@@ -182,7 +139,6 @@ def whatPercentIsClass(imgpath):
 
     percent = [HPNEpix/imgSize, MIApix/imgSize, PSpix/imgSize, BGpix/imgSize]
 
-    # print(percent)
 
     return percent
 
@@ -200,9 +156,8 @@ def pasteTextOnImage(image, text, loc=(0.2, 0.1)):
 
     return image
 
-
+## convert sparse matrix to rgb image
 def sparseToRGB(sparse, color_dict):
-    onesparsehot = np.array(sparse)
 
     sparse = np.transpose(sparse, [1, 2, 0])
     output = np.zeros(sparse.shape[0:2]+(3,))
@@ -235,21 +190,15 @@ def saveImageOutput(inputImage, outputImage, imgName, savePath, doISave=False, s
 
 # put ellipses on an image and return annotated image
 def putEllipsesOnImage(image, ellipseDict, magnification):
-    # print(ellipseList)
-    # print(ellipseDict.keys())
     for key in ellipseDict.keys():
-        # print(len(ellipse))
         ellipse = ellipseDict[key]
-        # print(ellipse)
         if len(ellipse) == 12:  # in case some erroneous additions were made for specific classes
-            # print(ellipse)
             x, y = int(ellipse[0]), int(ellipse[1])
             minor, major = int(ellipse[2]/2), int(ellipse[3]/2)
             angle = int(ellipse[4])
 
             avgAxes = (minor + major) / 2
             avgAxes = calibrationCorrection(avgAxes, magnification)
-            # avgAxes = f'{float(f"{avgAxes:.3g}"):g}'
 
             image = cv2.ellipse(image, (x, y), (minor, major),
                                 angle, 0, 360, (0, 0, 255), 3)
@@ -267,7 +216,6 @@ def suppressUndesirableEllipses(ellipseList):
     ellipseListOutput = []
     epsilon = 0.0001  # ensure not dividing by 0
     for ellipse in ellipseList:
-        # print(len(ellipse))
         if len(ellipse) == 12:  # in case some erroneous additions were made for specific classes; how the ellipse data point are set up
             minor, major = int(ellipse[2]/2), int(ellipse[3]/2)
 
@@ -277,7 +225,6 @@ def suppressUndesirableEllipses(ellipseList):
             # qualifiers to look for; as configurations change, qualifiers may also change.
             if (eccentricity > 0.3) and (avgAxes > 5):  ## (4/17/23) changed eccentricity to 0.3 forom 0.6 due to causing tracking problems
                 ellipseListOutput.append(ellipse)
-                # print('i was good!', ellipse)
 
         if len(ellipse) != 12:
             continue
@@ -287,7 +234,7 @@ def suppressUndesirableEllipses(ellipseList):
 
 def calibrationCorrection(lengthValues, magnification):
     # see excel worksheet, 'Calibration Data' for information regarding this value
-    # adjust this value; accounts for postporcessing (watershed, et.al) techniques that are partially inaccurate
+    # adjust this value; accounts for postporcessing (watershed, et.al) techniques that are partially inaccurate due to a number of factors
     fudgeFactor = 1.14
     calLength = fudgeFactor * lengthValues/(2.61/(25/magnification))
     return calLength
@@ -302,15 +249,11 @@ def resizeImage(image, resize):
 def outputRegions(image, imageName, regions, imgSavePath): ## given list of regions, segment src image per each region
     imagelist = []
     resize = (64,64) ## somewhat arbritrary; cifar10 uses 32x32, mnist uses 28x28, imagenet uses approx. 480x300. want good resolution, but not too much of upscale.
-    # print(len(regions))
 
-    # print(imgSavePath)
     for i, region in enumerate(regions):
-        # if len(region) != 0:
         savePath = ''
         x, y, w, h = region
         x, y, w, h = int(x), int(y), int(w), int(h)
-        # segment = image[x:(x+w), y:(y+h), :]
         segment = image[y:(y+h),x:(x+w),:]
         try:
             segment = resizeImage(segment,resize)
@@ -318,15 +261,9 @@ def outputRegions(image, imageName, regions, imgSavePath): ## given list of regi
             continue
         name = imageName + '_' + str(i)
         if imgSavePath is not None:
-            # # print(segment.shape)
-            # if 'HPNE' in name:
-            #     savePath = imgSavePath  
-            # if 'MIA' in name: 
-            #     savePath = imgSavePath
+
             savePath = imgSavePath
             try:
-                # print(name)
-                print(savePath)
                 saveImage(segment, name, savePath, secondImage=False)
             except:
                 continue

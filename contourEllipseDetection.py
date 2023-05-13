@@ -41,15 +41,14 @@ def negateBackground(feature, image):
     output = np.zeros(image.shape, dtype=np.uint8)
     cv2.drawContours(mask, [contour], -1, (255,255,255), -1)
 
+    ## finding whre the mask is not black and setting the output to be the image at those points
     output = np.where(mask > 0, image, mask)
 
     segment = output[y:(y+h),x:(x+w),:]
 
     ## how much of image is good content
     zeroPixels = np.sum(np.all(segment == [0,0,0], axis=-1))
-    # print(segment.shape)
     totalPixels = segment.shape[0] * segment.shape[1] 
-    # print(zeroPixels, totalPixels)
 
     percentInfo = 1 - zeroPixels / totalPixels # percent of pixels that are not black / total number of pixels
 
@@ -61,17 +60,18 @@ class ellipseDetection():
 
     def watershedSegment(self, img):  # find center of blobs using watershed method
         thresh = img.astype('float32')
-        thresh = cv2.threshold(thresh, 100, 255, cv2.THRESH_BINARY)[
-            1]  # binarize image
+        thresh = cv2.threshold(thresh, 100, 255, cv2.THRESH_BINARY)[1] # binarize image
+
         # find the distance between individual white pixel and nearest black pixel
         distance_map = ndimage.distance_transform_edt(thresh)
+
         # find centers of features
         thresh = thresh.astype('int32')
-        # print(distance_map, thresh)
         local_max = peak_local_max(
             distance_map, indices=False, min_distance=10, labels=thresh)
         markers = ndimage.label(local_max, structure=np.ones((3, 3)))[
             0]  # place labels on max feature image
+        
         # segment image, with markers serving as centers
         labels = watershed(-distance_map, markers, mask=thresh)
         labels = np.array(labels, dtype='uint8')
@@ -81,13 +81,17 @@ class ellipseDetection():
     def watershedEllipseFinder(self, img, labels):
         contour_list = []
         for label in np.unique(labels):
+
             if label == 0:  # ignoring zero values
                 continue
+
             mask = np.zeros(img.shape, dtype="uint8")
+
             # changing the mask to either b/w dependent on whether item is present
             mask[labels == label] = 255 
             cnts = cv2.findContours(
                 mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
             # takes first output from 'find contours' (is a tuple)
             cnts = cnts[0] if len(cnts) == 2 else cnts[1]
             c = max(cnts, key=cv2.contourArea)
@@ -114,17 +118,26 @@ class ellipseDetection():
                         ell_coord[i] = 0.01
             if len(contour) < 5:
                 continue
+
             # adding string of classtype at the end after processing for nan values
             ell_coord.append(classtype)
+
             # counter to determine what class was recognized most with ID
             ell_coord.append(1)
+
             # print(ell_coord)
             all_coord.append(ell_coord)
 
         # will return list of ellipses and their respective coordinates.
         return all_coord
 
-    def createImageRegion(self, image, coord, axes, resizeSize): ## given an image, central coordinates and axes, output the respective slice of image; resize to desired shape
+    '''
+    given an image, central coordiantes and axes, 
+    output the respective slice of image; resize to desried shape
+
+    '''
+    
+    def createImageRegion(self, image, coord, axes, resizeSize): 
         x, y = coord
 
         imH, imW, channels = image.shape ## getting shape to know bounds. 
@@ -154,22 +167,17 @@ class ellipseDetection():
         if(np.isnan(y) == True):
             y = 1
 
-        length = int(np.maximum(major, minor)) ## ensuring thatlength is at least one.
+        length = int(np.maximum(major, minor)) ## ensuring that length is at least one pixel long.
         if length ==0:
             length = 1
         
-        # tenpercentlength = int(length / 5) + 1
-        # length = length + tenpercentlength   ## just in case segmentation undershoots. 
 
-  
-        # print(x, length)
-        # print(y,length)
         xStart = int(x - 0.5*length)
         yStart = int(y - 0.5*length)
         xEnd = xStart + length
         yEnd = yStart + length
 
-        ## for catching excepptions where region is out of image bounds. 
+        ## for catching exceptions where region is out of image bounds. 
         if xStart < 0:
             xStart = 0
             xEnd = xStart + length
@@ -183,21 +191,16 @@ class ellipseDetection():
             yEnd = imH
             yStart = yEnd - length
 
-    
 
-        # print(x,y,axes[0],axes[1], length)
-        # print(xStart, yStart,xEnd, yEnd)
         h = yEnd - yStart
         w = xEnd - xStart
 
+        ## only otputting coordinates fo rbackgroudn negation, if desired
         coords = xStart, yStart, w, h
 
-        # print(image.shape)
-        # testsegment = image[975:995,23:43,:]
+
         segment = image[yStart:yEnd,xStart:xEnd,:] ## ensure axes are right. OpenCV is odd in that color channels are BGR, which makes for an intersting time. 
-        # print(segment.shape,resizeSize)
         segment = cv2.resize(segment, resizeSize, cv2.INTER_LINEAR)
-        # print(segment.shape)
 
         return segment, coords
     
@@ -227,38 +230,28 @@ class ellipseDetection():
     
                 segment, coord = self.createImageRegion(RGBimg, coord,axes,resize)   ## segmenting region cell is in. 
 
-                # print(coord)
-                # print(contour)
+
                 blackBackSegment, __ = negateBackground([coord,contour],RGBimg)
-                print(type(blackBackSegment))
-                print(blackBackSegment.shape)
                 blackBackSegment = cv2.resize(blackBackSegment, resize, cv2.INTER_LINEAR)
-                # h = cy - 0.5*ly
-                # w = cx - 0.5*lx
-                testsegment = np.array(segment)
+
+                testsegment = np.array(segment)  ## segment that is saaved to file for test analysis purposes
                 segment = blackBackSegment
-                # imageOutput.append(testsegment)
-                # plt.imshow(testsegment, interpolation='nearest')
-                # plt.show()
-                # showImageDelay(testsegment, 1,'semgent')
+
                 with torch.no_grad():
-                    # print(segment.shape)
+                    ## convert to proper shape, type
                     segment = np.transpose(segment, [2, 0, 1])
                     segment = np.expand_dims(segment, 0)
-                    # print(segment.shape)
                     segment = torch.from_numpy(segment)
                     segment = segment.float() ## necessary for weight multiplication. 
 
                     classPrediction = classifyNet(segment) ## prediction of class from classification network
-                    # print(classPrediction)
                     _, index = torch.max(classPrediction, dim=1) ## getting largest value for prediction output
 
-                    outputPrediction = np.array(classPrediction)
-                    # print(outputPrediction)
-                    outputPrediction = [float(outputPrediction[0][0]), float(outputPrediction[0][1])]
-                    classPrediction = classList[index]
+                    outputPrediction = np.array(classPrediction)  # ensure proper type
+                    outputPrediction = [float(outputPrediction[0][0]), float(outputPrediction[0][1])]   ## predictoin value for each class
+                    classPrediction = classList[index]  ## string of class prediction
 
-                    testsegment = cv2.putText(testsegment, classPrediction, (10, 10), cv2.FONT_HERSHEY_SIMPLEX, 0.2, (0, 0, 255), 1, cv2.LINE_AA)
+                    testsegment = cv2.putText(testsegment, classPrediction, (10, 10), cv2.FONT_HERSHEY_SIMPLEX, 0.2, (0, 0, 255), 1, cv2.LINE_AA)  ## for test analysis purposes
                     imageOutput.append(testsegment)
 
                     #    adding string of classtype at the end after processing for nan values
@@ -282,7 +275,6 @@ class ellipseDetection():
         return all_coord, imageOutput
 
     def ellipseCoords(self, img, classtype):
-        # print(mode1(img))
         labels = self.watershedSegment(img)
         contours = self.watershedEllipseFinder(img, labels)
         ellipses = self.ellipseFromCoords(contours, classtype)
@@ -295,14 +287,6 @@ class ellipseDetection():
         ellipses = self.ellipseFromCoordsClassifier(contours, RGBimg, classifyNet, classList, frameNumber)
 
         return ellipses
-
-
-
-
-def mode1(x):
-    values, counts = np.unique(x, return_counts=True)
-    m = counts.argmax()
-    return values[m], counts[m]
 
 
 def getEllipsesFromClassList(imageList, nameList):
@@ -329,7 +313,6 @@ this function also has the input of the rgb source image to segment the region t
 def getEllipsesFromClassListClassifier(BWimg, RGBimg,classifyNet, classList, frameNumber): 
     ellipseCoord = ellipseDetection()
 
-    # print(BWimg.shape)
     ellipses, imageList = ellipseCoord.ellipseCoordsClassifier(BWimg,RGBimg,classifyNet,classList, frameNumber)  
     ellipses = suppressUndesirableEllipses(ellipses)  ### getting rid of any ellipses that do not fit appropriate parameters. 
 
