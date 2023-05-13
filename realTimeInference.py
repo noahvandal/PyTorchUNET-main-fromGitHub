@@ -1,4 +1,3 @@
-from preProcess import preProcess
 from contourEllipseDetection import ellipseDetection, processOneHotIntoClassBW, getEllipsesFromClassList, getEllipsesFromClassListClassifier
 # from PYtracking import Tracking, postVideoProcessList
 # from PYtracking import postVideoProcessList
@@ -9,7 +8,7 @@ from sys import stdout
 import numpy as np
 from model import UNET
 from IPython.display import clear_output
-from auxiliary import saveImageOutput, putEllipsesOnImage, suppressUndesirableEllipses
+from auxiliary import saveImageOutput, putEllipsesOnImage, suppressUndesirableEllipses, outputRegions, saveImage
 from dataset import cellColor2Label, color2label, outputClassImages, RGBtoBW
 from evaluate import onehot_to_rgb
 from torchvision import transforms
@@ -18,7 +17,7 @@ import time
 import os
 import matplotlib.pyplot as plt
 from classifier import Classify
-from classifierNets import Classifier_v12
+from classifierNets import ClassifierHyperparam_v2
 
 if torch.cuda.is_available():
     DEVICE = 'cuda:1'
@@ -55,10 +54,10 @@ def onehotToBW(image,outputAsRGB=False):
     # showImage(output)
     return output
 
-def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, magnification):
+def main(videoPath, saveImagePath, saveCSVPath, saveAccPath, modelPath, classifyModelPath, magnification):
 
     headerFile = ['ID', 'Coordinates', 'Axes Length', 'Number of Frames Present',
-                  'Average Speed (px)', 'Identity', 'Number of frames as identity', 'Diameter', 'Start Frame', 'End Frame', 'Class Prob']  # data for csv output
+                  'Average Speed (px)', 'Identity', 'Number of frames as identity', 'Diameter', 'Start Frame', 'End Frame', 'HPNE Class Prob', 'MIA Class Prob']  # data for csv output
 
     model = UNET(in_channels=3, classes=2)
     checkpoint = torch.load(modelPath, map_location=torch.device(DEVICE))
@@ -73,7 +72,7 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
     The following section of code is for the classification network, if present. 
     """
     # classificationModel = Classify(1) ## batch size of 1
-    classificationModel = Classifier_v12()
+    classificationModel = ClassifierHyperparam_v2()
     checkpoint = torch.load(classifyModelPath)
     classificationModel.load_state_dict(checkpoint['model_state_dict'])
 
@@ -99,6 +98,9 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
     iterator = 1  # count how many frames pass
 
     src = cv2.VideoCapture(videoPath)
+
+    ##list to keep accuracy values
+    hpneMiaAcc = []
     while (src.isOpened()):  # qualifier like 'video open' or something here.
 
         startFrame = time.time()
@@ -149,6 +151,7 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         # getting b/w mask for each class present
         # print(type(output))
 
+
         output = output.detach().cpu().numpy()  ## to pull from gpu for inferencing on cpu
 
         
@@ -176,10 +179,13 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
         # plt.show()
 
         # getting ellipses for each class present
-        totalEllipses = getEllipsesFromClassListClassifier(bwImage,origImgGray,classificationModel, classifyList, iterator)
+        totalEllipses, imageList = getEllipsesFromClassListClassifier(bwImage,origImgGray,classificationModel, classifyList, iterator)
 
         
         # print(totalEllipses)
+        for i, img in enumerate(imageList):
+            imName = str(iterator) + '_' + str(i) + '.png'
+            saveImage(img, imName, saveImagePath)
         # placeholdellipse = totalEllipses.copy()
         # print(pixelChange)
         # print(len(totalEllipses))
@@ -188,6 +194,31 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
                            id, changeinpixel, pixelChange, magnification)   ## update list based on points in previous frame. 
 
         CurrentDict, id, GlobalList, _, changeinpixel = tracker.comparePointsList()
+
+        for ellipse in CurrentDict.values():
+            acc = ellipse[11]
+            if len(acc) == 4:
+                # print(ellipse)
+                acc = ellipse[11]
+                # print(acc)
+                hpneAcc = acc[2]
+                miaAcc = acc[3]
+                hpneMiaAcc.append([hpneAcc, miaAcc])
+
+        ## getting ellipses from image
+        ellipseList = []
+        for i, ellipse in enumerate(CurrentDict.values()):
+            ell = ellipse
+            ell = [ell[0], ell[1], ell[2], ell[3]]  ## only outputting x,y,w,h
+            ellipseList.append(ell)
+        
+
+        ## making frame right dimensions for output
+        segmentImg = frame.detach().cpu().numpy()
+        segmentImg = np.array(segmentImg)
+        segmentImg = segmentImg[0,:,:,:]
+        segmentImg = np.transpose(segmentImg, [1, 2, 0])        
+        # _ = outputRegions(segmentImg, str(iterator), ellipseList, saveImagePath)
 
         # GlobalList.extend(outOfFrameList)
         # print(changeinpixel)
@@ -246,6 +277,11 @@ def main(videoPath, saveImagePath, saveCSVPath, modelPath, classifyModelPath, ma
             write.writerow(headerFile)
             write.writerows(GlobalList)
 
+        with open(saveAccPath, 'w', newline='') as csvwriter:
+            write = csv.writer(csvwriter)
+            # write.writerow(headerFile)
+            write.writerows(hpneMiaAcc)
+
         # clear_output(wait=True)
         # print(CurrentDict)
     with open(saveCSVPath, 'w', newline='') as csvwriter:
@@ -281,6 +317,7 @@ def runMultipleVideos(rootPath, extraName,dateFolder, modelPath, classifyModelPa
             os.mkdir(saveImagePath)
         
         saveCSVPath = rootPath + 'Output/' + dateFolder + str(videoName) + extraName + '.csv'
+        saveAccPath = rootPath + 'Output/' + dateFolder + str(videoName) + extraName + '_acc.csv'
 
         videoPath = rootPath + video
 
@@ -289,7 +326,7 @@ def runMultipleVideos(rootPath, extraName,dateFolder, modelPath, classifyModelPa
         magnification = 25
 
         # if i == 0:
-        main(videoPath, saveImagePath, saveCSVPath, modelPath,classifyModelPath, magnification)
+        main(videoPath, saveImagePath, saveCSVPath,saveAccPath, modelPath,classifyModelPath, magnification)
 
 
 
@@ -309,21 +346,27 @@ if __name__ == '__main__':
     # modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneMarchModel/030723_2x_3c_PureTrainHPNEbias_v7_model.pt'
     modelPath = '/home/noahvandal/my_project_dir/my_project_env/TrainUNET/Models/041123_2c_v3_wAugs_p10.pt'
 
-    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/040623_2c_v12_pureTest_Linux_drop5_noAugsSingleFolder_t3.pt'
+    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/051023_2c_Hyperparam_v2_fillTrain_noAug_drop10_bn_binaryBack_adamW_631split_earlyTerminate_quintMia.pt'
     # videoPath = rootPath + 'DatasetFeb10/HPNE/230203121917.mp4'
     # videoPath = rootPath + \
     # 'Videos/August 2022/20um/5ul_min/25x mag/1280x960 px/5_25_1280_0.mp4'
     # magnification = 25
-    name = '041023_2c_v12_pureTest_Linux_drop5_noAugsSingleFolder_t3_bwSeg'
+    name = '051023_2c_Hyperparam_v2_fillTrain_noAug_drop10_bn_binaryBack_adamW_631split_earlyTerminate_quintMia'
 
-    dateFolder = '17_April/'
+    dateFolder = '11_May/'  ## the name of folder within output folder
 
     # main(videoPath, saveImagePath, saveCSVPath,
         #  modelPath, magnification=magnification)
     # runMultipleVideos(rootPath + 'DatasetFeb10/HPNE/',date, modelPath, classifyModelPath)
     # runMultipleVideos(rootPath + 'DatasetFeb10/MIA/',date, modelPath, classifyModelPath)
 
-    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/HPNE/',name, dateFolder, modelPath, classifyModelPath)
     runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/MIA/',name, dateFolder, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/HPNE/',name, dateFolder, modelPath, classifyModelPath)
     runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/1_9 Ratio/',name, dateFolder, modelPath, classifyModelPath)
     runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/99_1 Ratio/',name, dateFolder, modelPath, classifyModelPath)
+
+    runMultipleVideos(rootPath + 'VideoInferences/DatasetDec15/HPNE/',name, dateFolder, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/DatasetDec15/MIA/',name, dateFolder, modelPath, classifyModelPath)
+
+
+    # runMultipleVideos(rootPath + 'VideoInferences/TestOutput/',name, dateFolder, modelPath, classifyModelPath)

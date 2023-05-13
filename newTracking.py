@@ -100,7 +100,7 @@ class Tracking():
                     # print(listAvg[0][0])
                     # print(currentAvg[0])
                     # print(currentAvg, listAvg)
-                    newAvg = [currentAvg[0] + listAvg[0], currentAvg[1] + listAvg[1]]
+                    newAvg = [currentAvg[0] + listAvg[0], currentAvg[1] + listAvg[1], listAvg[0], listAvg[1]]
                     # print(newAvg)
 
                     new_point = [pt[0], pt[1], minor,
@@ -144,7 +144,7 @@ class Tracking():
                     classProb = id_val[11]
 
                     combine_id_data = [object_id, coord, axes,
-                                       numFrames, avgSpeed, Identity, numClassEncounter, Diameter, startFrame, endFrame, classProb]
+                                       numFrames, avgSpeed, Identity, numClassEncounter, Diameter, startFrame, endFrame, classProb[0], classProb[1]]
                     # making sure to ignore small artifacts
                     if (avgDiam >= 3) and (avgDiam <= 30) and (numberFrames >= 3) and ((avgPositionChange) >= 3):
                         # storing data regarding beads that have left the frame.

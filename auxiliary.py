@@ -20,7 +20,7 @@ def showImageDelay(image, delay, text):
 
 def saveImage(image, imageName, savePath, secondImage=False):
     imageSavePath = savePath + imageName + '.png'
-    # print(imageSavePath)
+    print(imageSavePath)
 
     # print(image.shape, secondImage.shape)
 
@@ -291,3 +291,46 @@ def calibrationCorrection(lengthValues, magnification):
     fudgeFactor = 1.14
     calLength = fudgeFactor * lengthValues/(2.61/(25/magnification))
     return calLength
+
+
+def resizeImage(image, resize):
+    image = cv2.resize(image, resize, cv2.INTER_LINEAR)
+    return image
+
+
+
+def outputRegions(image, imageName, regions, imgSavePath): ## given list of regions, segment src image per each region
+    imagelist = []
+    resize = (64,64) ## somewhat arbritrary; cifar10 uses 32x32, mnist uses 28x28, imagenet uses approx. 480x300. want good resolution, but not too much of upscale.
+    # print(len(regions))
+
+    # print(imgSavePath)
+    for i, region in enumerate(regions):
+        # if len(region) != 0:
+        savePath = ''
+        x, y, w, h = region
+        x, y, w, h = int(x), int(y), int(w), int(h)
+        # segment = image[x:(x+w), y:(y+h), :]
+        segment = image[y:(y+h),x:(x+w),:]
+        try:
+            segment = resizeImage(segment,resize)
+        except:
+            continue
+        name = imageName + '_' + str(i)
+        if imgSavePath is not None:
+            # # print(segment.shape)
+            # if 'HPNE' in name:
+            #     savePath = imgSavePath  
+            # if 'MIA' in name: 
+            #     savePath = imgSavePath
+            savePath = imgSavePath
+            try:
+                # print(name)
+                print(savePath)
+                saveImage(segment, name, savePath, secondImage=False)
+            except:
+                continue
+        else:
+            imagelist.append(segment)
+        
+    return imagelist

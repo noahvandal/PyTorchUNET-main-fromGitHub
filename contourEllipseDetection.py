@@ -31,6 +31,31 @@ def processOneHotIntoClassBW(img):
 
     return imgList
 
+## this function takes cooordinates andcontorus as input and outputs a region with the backgroudn zeroed out. 
+def negateBackground(feature, image):
+    coord, contour = feature
+    x, y, w, h = coord
+
+    ## create bw mask of feature
+    mask = np.zeros(image.shape, dtype=np.uint8)
+    output = np.zeros(image.shape, dtype=np.uint8)
+    cv2.drawContours(mask, [contour], -1, (255,255,255), -1)
+
+    output = np.where(mask > 0, image, mask)
+
+    segment = output[y:(y+h),x:(x+w),:]
+
+    ## how much of image is good content
+    zeroPixels = np.sum(np.all(segment == [0,0,0], axis=-1))
+    # print(segment.shape)
+    totalPixels = segment.shape[0] * segment.shape[1] 
+    # print(zeroPixels, totalPixels)
+
+    percentInfo = 1 - zeroPixels / totalPixels # percent of pixels that are not black / total number of pixels
+
+
+    return segment, percentInfo
+
 
 class ellipseDetection():
 
@@ -60,7 +85,7 @@ class ellipseDetection():
                 continue
             mask = np.zeros(img.shape, dtype="uint8")
             # changing the mask to either b/w dependent on whether item is present
-            mask[labels == label] = 255
+            mask[labels == label] = 255 
             cnts = cv2.findContours(
                 mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             # takes first output from 'find contours' (is a tuple)
@@ -133,8 +158,8 @@ class ellipseDetection():
         if length ==0:
             length = 1
         
-        tenpercentlength = int(length / 5) + 1
-        length = length + tenpercentlength   ## just in case segmentation undershoots. 
+        # tenpercentlength = int(length / 5) + 1
+        # length = length + tenpercentlength   ## just in case segmentation undershoots. 
 
   
         # print(x, length)
@@ -162,6 +187,10 @@ class ellipseDetection():
 
         # print(x,y,axes[0],axes[1], length)
         # print(xStart, yStart,xEnd, yEnd)
+        h = yEnd - yStart
+        w = xEnd - xStart
+
+        coords = xStart, yStart, w, h
 
         # print(image.shape)
         # testsegment = image[975:995,23:43,:]
@@ -170,12 +199,15 @@ class ellipseDetection():
         segment = cv2.resize(segment, resizeSize, cv2.INTER_LINEAR)
         # print(segment.shape)
 
-        return segment
+        return segment, coords
     
     # given list of contours, will make ellipses from them; will also send predicted ellipses to classifier network to determine class. 
     def ellipseFromCoordsClassifier(self, contours, RGBimg, classifyNet, classList, frameNumber):
         ell_coord = []
         all_coord = []
+
+        imageOutput = []
+
         # print(contours)
         for contour in contours:
             if len(contour) >= 5:
@@ -193,8 +225,19 @@ class ellipseDetection():
                     if (np.isinf(ell_coord[i]) == True):
                         ell_coord[i] = 0.01
     
-                segment = self.createImageRegion(RGBimg, coord,axes,resize)   ## segmenting region cell is in. 
+                segment, coord = self.createImageRegion(RGBimg, coord,axes,resize)   ## segmenting region cell is in. 
+
+                # print(coord)
+                # print(contour)
+                blackBackSegment, __ = negateBackground([coord,contour],RGBimg)
+                print(type(blackBackSegment))
+                print(blackBackSegment.shape)
+                blackBackSegment = cv2.resize(blackBackSegment, resize, cv2.INTER_LINEAR)
+                # h = cy - 0.5*ly
+                # w = cx - 0.5*lx
                 testsegment = np.array(segment)
+                segment = blackBackSegment
+                # imageOutput.append(testsegment)
                 # plt.imshow(testsegment, interpolation='nearest')
                 # plt.show()
                 # showImageDelay(testsegment, 1,'semgent')
@@ -215,6 +258,9 @@ class ellipseDetection():
                     outputPrediction = [float(outputPrediction[0][0]), float(outputPrediction[0][1])]
                     classPrediction = classList[index]
 
+                    testsegment = cv2.putText(testsegment, classPrediction, (10, 10), cv2.FONT_HERSHEY_SIMPLEX, 0.2, (0, 0, 255), 1, cv2.LINE_AA)
+                    imageOutput.append(testsegment)
+
                     #    adding string of classtype at the end after processing for nan values
                     ell_coord.append(classPrediction)
                     # counter to determine what class was recognized most with ID
@@ -233,7 +279,7 @@ class ellipseDetection():
             all_coord.append(ell_coord)
 
         # will return list of ellipses and their respective coordinates.
-        return all_coord
+        return all_coord, imageOutput
 
     def ellipseCoords(self, img, classtype):
         # print(mode1(img))
@@ -284,8 +330,8 @@ def getEllipsesFromClassListClassifier(BWimg, RGBimg,classifyNet, classList, fra
     ellipseCoord = ellipseDetection()
 
     # print(BWimg.shape)
-    ellipses = ellipseCoord.ellipseCoordsClassifier(BWimg,RGBimg,classifyNet,classList, frameNumber)  
+    ellipses, imageList = ellipseCoord.ellipseCoordsClassifier(BWimg,RGBimg,classifyNet,classList, frameNumber)  
     ellipses = suppressUndesirableEllipses(ellipses)  ### getting rid of any ellipses that do not fit appropriate parameters. 
 
-    return ellipses
+    return ellipses, imageList
 
