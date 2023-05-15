@@ -274,12 +274,12 @@ if __name__ == '__main__':
     # modelPath = rootPath + 'UNET_MC_PyTorch/FineTuneMarchModel/030723_2x_3c_PureTrainHPNEbias_v7_model.pt'
     modelPath = '/home/noahvandal/my_project_dir/my_project_env/TrainUNET/Models/041123_2c_v3_wAugs_p10.pt'
 
-    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/051023_2c_Hyperparam_v2_fillTrain_noAug_drop10_bn_binaryBack_adamW_631split_earlyTerminate_quintMia.pt'
+    classifyModelPath = rootPath + 'HybridNet/Dataset/Model/051523_2c_Hyperparam_v2_fillTrain_noAug_drop10_bn_binaryBack_adamW_631split_earlyTerminate_1Mia_unseen.pt'
     # videoPath = rootPath + 'DatasetFeb10/HPNE/230203121917.mp4'
     # videoPath = rootPath + \
     # 'Videos/August 2022/20um/5ul_min/25x mag/1280x960 px/5_25_1280_0.mp4'
     # magnification = 25
-    name = '051023_2c_Hyperparam_v2_fillTrain_noAug_drop10_bn_binaryBack_adamW_631split_earlyTerminate_quintMia'
+    name = '051523_2c_Hyperparam_v2_fillTrain_noAug_drop10_bn_binaryBack_adamW_631split_earlyTerminate_1Mia_unseen'
 
     dateFolder = '11_May/'  ## the name of folder within output folder
 
@@ -288,13 +288,13 @@ if __name__ == '__main__':
     # runMultipleVideos(rootPath + 'DatasetFeb10/HPNE/',date, modelPath, classifyModelPath)
     # runMultipleVideos(rootPath + 'DatasetFeb10/MIA/',date, modelPath, classifyModelPath)
 
-    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/MIA/',name, dateFolder, modelPath, classifyModelPath)
-    runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/HPNE/',name, dateFolder, modelPath, classifyModelPath)
-    runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/1_9 Ratio/',name, dateFolder, modelPath, classifyModelPath)
-    runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/99_1 Ratio/',name, dateFolder, modelPath, classifyModelPath)
+    # runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/MIA/',name, dateFolder, modelPath, classifyModelPath)
+    # runMultipleVideos(rootPath + 'VideoInferences/DatasetFeb10/HPNE/',name, dateFolder, modelPath, classifyModelPath)
+    # runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/1_9 Ratio/',name, dateFolder, modelPath, classifyModelPath)
+    # runMultipleVideos(rootPath + 'VideoInferences/Cancer Cells February 13/99_1 Ratio/',name, dateFolder, modelPath, classifyModelPath)
 
-    runMultipleVideos(rootPath + 'VideoInferences/DatasetDec15/HPNE/',name, dateFolder, modelPath, classifyModelPath)
-    runMultipleVideos(rootPath + 'VideoInferences/DatasetDec15/MIA/',name, dateFolder, modelPath, classifyModelPath)
+    # runMultipleVideos(rootPath + 'VideoInferences/DatasetDec15/HPNE/',name, dateFolder, modelPath, classifyModelPath)
+    # runMultipleVideos(rootPath + 'VideoInferences/DatasetDec15/MIA/',name, dateFolder, modelPath, classifyModelPath)
 
 
-    # runMultipleVideos(rootPath + 'VideoInferences/TestOutput/',name, dateFolder, modelPath, classifyModelPath)
+    runMultipleVideos(rootPath + 'VideoInferences/TestOutput/',name, dateFolder, modelPath, classifyModelPath)
